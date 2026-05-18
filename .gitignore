@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+*.salt
+hyperion_identity.json
+hyperion_sessions.db
+hyperion_messages.db
+~/.hyperion/
+__pycache__/
+*.pyc
