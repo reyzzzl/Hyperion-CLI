@@ -109,7 +109,7 @@ sudo apt install build-essential cmake tor
 ### 2. Package Compilation via PIP
 Since Hyperion v2.0.0 is built around a standardized setup.py format, you can compile and distribute the global binary path hyperion across your system paths instantly:
 ```bash
-git clone [https://github.com/reyzzzl/Hyperion-Chat.git](https://github.com/reyzzzl/Hyperion-Chat.git)
+git clone [https://github.com/reyzzzl/Hyperion-CLI.git](https://github.com/reyzzzl/Hyperion-CLI.git)
 cd Hyperion-Chat
 pip install .
 
