@@ -140,12 +140,14 @@ Contributions are highly welcome. High-priority improvement paths currently incl
  * Migrating data packets from basic string delimiters (||END||) to a structured *binary framing protocol*.
  * Porting core application structures to mobile ecosystems (Android/iOS).
 ## 📚 References & Further Reading
+
 These resources serve as the architectural foundation for Hyperion:
- * NIST FIPS 203 — ML-KEM Standard
- * Open Quantum Safe (OQS) Project
- * The Signal Protocol Specifications
- * RFC 5869 — HKDF Specification
- * The Tor Project Documentation
- * A Graduate Course in Applied Cryptography
+
+* [NIST FIPS 203 — ML-KEM Standard](https://csrc.nist.gov/pubs/fips/203/ipd)
+* [Open Quantum Safe (OQS) Project](https://openquantumsafe.org/)
+* [The Signal Protocol Specifications](https://signal.org/docs/)
+* [RFC 5869 — HKDF Specification](https://datatracker.ietf.org/doc/html/rfc5869)
+* [The Tor Project Documentation](https://community.torproject.org/onion-services/)
+* [A Graduate Course in Applied Cryptography](https://toc.cryptobook.us/)
 ## 📝 License
 Distributed under the **GNU General Public License v3.0**. See LICENSE for the full text. You can copy, modify, and distribute this software, provided you keep it open-source under the same license.
