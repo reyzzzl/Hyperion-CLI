@@ -127,7 +127,7 @@ hyperion connect <peer_address_or_onion_string>
 
 ```
 ## 🚨 Disclaimer & Project Status
-> ⚠️ **CRITICAL:** The Hyperion project is currently in its **Beta Phase** and is strictly meant for research and educational purposes. The codebase **has not been audited by an independent, professional third-party firm**.
+>  The Hyperion project is currently in its **Beta Phase** and is strictly meant for research and educational purposes. The codebase **has not been audited by an independent, professional third-party firm**.
 > 
 Cryptographic engineering is highly fragile—the minor misconfiguration of an implementation vector can break theoretical safety. Do not rely on this project as your primary means of defense if your life, safety, or high-risk operational security depends on it. If you are in a vulnerable situation, utilize battle-tested tools and consult trusted frameworks like the EFF's Surveillance Self-Defense Guide.
 ### 🐛 Bug Reporting & Feedback
