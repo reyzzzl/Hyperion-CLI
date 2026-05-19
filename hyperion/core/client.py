@@ -145,7 +145,7 @@ class HyperionClient:
             ciphertext = peer_data['ciphertext']
             kyber_secret = self.pqc.decapsulate(ciphertext)
             root_key = self.pqc.derive_root_key(kyber_secret)
-            self.active_session.ratchet = DoubleRatchet(root_key, self._auto_rekey_callback)
+            self.active_session.ratchet = DoubleRatchet(root_key, self._auto_rekey_callback, is_initiator=False)
             self.active_session.shared_secret = root_key
             self.active_session.last_active = datetime.now()
             self.log_callback("[+] Re-handshake completed")
@@ -216,7 +216,7 @@ class HyperionClient:
             if peer_address:
                 shared_secret, _ = handshake.client_handshake(self.log_callback)
                 root_key = self.pqc.derive_root_key(shared_secret)
-                ratchet = DoubleRatchet(root_key, self._auto_rekey_callback)
+                ratchet = DoubleRatchet(root_key, self._auto_rekey_callback, is_initiator=True)
                 self.active_session = ChatSession(
                     peer_address=peer_address,
                     peer_fingerprint=handshake.get_peer_fingerprint(),
@@ -228,7 +228,7 @@ class HyperionClient:
                 ciphertext = handshake.server_handshake(self.log_callback)
                 kyber_secret = self.pqc.decapsulate(ciphertext)
                 root_key = self.pqc.derive_root_key(kyber_secret)
-                ratchet = DoubleRatchet(root_key, self._auto_rekey_callback)
+                ratchet = DoubleRatchet(root_key, self._auto_rekey_callback, is_initiator=False)
                 self.active_session = ChatSession(
                     peer_address="unknown",
                     peer_fingerprint=handshake.get_peer_fingerprint(),
