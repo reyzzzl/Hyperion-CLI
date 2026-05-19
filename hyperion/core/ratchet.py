@@ -33,8 +33,8 @@ class DoubleRatchet:
 
     def _check_rekey(self):
         now = time.time()
-        need_rekey = (self.send_message_count >= self.rekey_interval_messages or self.recv_message_count >= self.rekey_interval_messages or now - self._last_rekey_time >= self.rekey_interval_seconds)
-        if need_rekey and self.auto_rekey_callback:
+        need = self.send_message_count >= self.rekey_interval_messages or self.recv_message_count >= self.rekey_interval_messages or now - self._last_rekey_time >= self.rekey_interval_seconds
+        if need and self.auto_rekey_callback:
             self.auto_rekey_callback()
             self._last_rekey_time = now
             self.send_message_count = 0
@@ -42,32 +42,31 @@ class DoubleRatchet:
 
     def encrypt(self, plaintext: str) -> dict:
         self._check_rekey()
-        message_key = self._message_key(self.send_chain_key, self.send_message_count)
+        mk = self._message_key(self.send_chain_key, self.send_message_count)
         self.send_chain_key = self._ratchet_chain(self.send_chain_key)
         self.send_message_count += 1
         iv = secrets.token_bytes(12)
-        cipher = Cipher(algorithms.AES256(message_key), modes.GCM(iv), backend=default_backend())
-        encryptor = cipher.encryptor()
-        ciphertext = encryptor.update(plaintext.encode()) + encryptor.finalize()
-        return {'iv': base64.b64encode(iv).decode(), 'tag': base64.b64encode(encryptor.tag).decode(), 'ct': base64.b64encode(ciphertext).decode(), 'counter': self.send_message_count - 1}
+        cipher = Cipher(algorithms.AES256(mk), modes.GCM(iv), backend=default_backend())
+        enc = cipher.encryptor()
+        ct = enc.update(plaintext.encode()) + enc.finalize()
+        return {'iv': base64.b64encode(iv).decode(), 'tag': base64.b64encode(enc.tag).decode(), 'ct': base64.b64encode(ct).decode(), 'counter': self.send_message_count - 1}
 
     def decrypt(self, data: dict) -> str:
         iv = base64.b64decode(data['iv'])
         tag = base64.b64decode(data['tag'])
-        ciphertext = base64.b64decode(data['ct'])
-        received_counter = data['counter']
-        if received_counter < self.recv_message_count:
-            raise ValueError("Replay attack detected")
-        while received_counter > self.recv_message_count:
-            self._message_key(self.recv_chain_key, self.recv_message_count)
+        ct = base64.b64decode(data['ct'])
+        rc = data['counter']
+        if rc < self.recv_message_count:
+            raise ValueError("Replay attack")
+        while rc > self.recv_message_count:
             self.recv_chain_key = self._ratchet_chain(self.recv_chain_key)
             self.recv_message_count += 1
-        message_key = self._message_key(self.recv_chain_key, received_counter)
+        mk = self._message_key(self.recv_chain_key, rc)
         self.recv_chain_key = self._ratchet_chain(self.recv_chain_key)
         self.recv_message_count += 1
-        cipher = Cipher(algorithms.AES256(message_key), modes.GCM(iv, tag), backend=default_backend())
-        decryptor = cipher.decryptor()
-        plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+        cipher = Cipher(algorithms.AES256(mk), modes.GCM(iv, tag), backend=default_backend())
+        dec = cipher.decryptor()
+        plaintext = dec.update(ct) + dec.finalize()
         return plaintext.decode()
 
     def rekey(self):
@@ -76,9 +75,6 @@ class DoubleRatchet:
         self.recv_message_count = 0
         self._init_chains()
         return True
-
-    def get_stats(self) -> dict:
-        return {'send_count': self.send_message_count, 'recv_count': self.recv_message_count, 'last_rekey': self._last_rekey_time}
 
     def wipe_memory(self):
         self.root_key = secrets.token_bytes(32)
