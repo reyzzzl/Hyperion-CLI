@@ -224,3 +224,12 @@ hyperion_messages.db
 ~/.hyperion/
 __pycache__/
 *.pyc
+
+__pycache__/
+*.pyc
+*.db
+*.salt
+.hyperion/
+data/
+*.enc
+.DS_Store
