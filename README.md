@@ -1,4 +1,5 @@
 # Hyperion PQC
+> bugs are being fixed, please don't install yet 
 
 ![Status Update](https://img.shields.io/badge/Status-v2-red.svg)
 ![Type CLI--Application](https://img.shields.io/badge/Type-CLI%20Application-blue.svg)
