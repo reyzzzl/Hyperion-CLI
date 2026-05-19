@@ -2,7 +2,7 @@ import sqlite3
 import base64
 import secrets
 import os
-from typing import List, Optional
+from typing import List
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from cryptography.hazmat.backends import default_backend
@@ -33,21 +33,20 @@ class EncryptedStorage:
             return data
         iv = secrets.token_bytes(12)
         cipher = Cipher(algorithms.AES256(self.key), modes.GCM(iv), backend=default_backend())
-        encryptor = cipher.encryptor()
-        ciphertext = encryptor.update(data.encode()) + encryptor.finalize()
-        combined = iv + encryptor.tag + ciphertext
-        return base64.b64encode(combined).decode()
+        enc = cipher.encryptor()
+        ct = enc.update(data.encode()) + enc.finalize()
+        return base64.b64encode(iv + enc.tag + ct).decode()
 
-    def _decrypt(self, enc_data: str) -> str:
+    def _decrypt(self, enc: str) -> str:
         if not self.key:
-            return enc_data
-        raw = base64.b64decode(enc_data)
+            return enc
+        raw = base64.b64decode(enc)
         iv = raw[:12]
         tag = raw[12:28]
-        ciphertext = raw[28:]
+        ct = raw[28:]
         cipher = Cipher(algorithms.AES256(self.key), modes.GCM(iv, tag), backend=default_backend())
-        decryptor = cipher.decryptor()
-        return (decryptor.update(ciphertext) + decryptor.finalize()).decode()
+        dec = cipher.decryptor()
+        return (dec.update(ct) + dec.finalize()).decode()
 
     def _init_db(self):
         conn = sqlite3.connect(self.db_path)
@@ -56,50 +55,54 @@ class EncryptedStorage:
         conn.commit()
         conn.close()
 
-    def save_message(self, peer_address: str, direction: str, message: str):
-        encrypted = self._encrypt(message)
+    def save_message(self, addr: str, dir: str, msg: str):
+        enc = self._encrypt(msg)
         conn = sqlite3.connect(self.db_path)
-        conn.execute("INSERT INTO messages (peer_address, direction, message, timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)", (peer_address, direction, encrypted))
+        conn.execute("INSERT INTO messages (peer_address, direction, message, timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)", (addr, dir, enc))
         conn.commit()
         conn.close()
 
-    def get_chat_history(self, peer_address: str, limit: int = 100) -> List[dict]:
+    def get_chat_history(self, addr: str, limit: int = 100) -> List[dict]:
         conn = sqlite3.connect(self.db_path)
-        cursor = conn.execute("SELECT direction, message, timestamp FROM messages WHERE peer_address = ? ORDER BY timestamp DESC LIMIT ?", (peer_address, limit))
-        messages = [{'direction': row[0], 'message': self._decrypt(row[1]), 'timestamp': row[2]} for row in cursor.fetchall()]
+        cur = conn.execute("SELECT direction, message, timestamp FROM messages WHERE peer_address = ? ORDER BY timestamp DESC LIMIT ?", (addr, limit))
+        msgs = [{'direction': row[0], 'message': self._decrypt(row[1]), 'timestamp': row[2]} for row in cur.fetchall()]
         conn.close()
-        return messages
+        return msgs
 
-    def save_contact(self, peer_address: str, peer_fingerprint: str, alias: str = None):
+    def save_contact(self, addr: str, fp: str, alias: str = None):
         conn = sqlite3.connect(self.db_path)
-        conn.execute("INSERT OR REPLACE INTO contacts (peer_address, peer_fingerprint, alias, last_seen, trusted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)", (peer_address, peer_fingerprint, alias))
+        conn.execute("INSERT OR REPLACE INTO contacts (peer_address, peer_fingerprint, alias, last_seen, trusted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)", (addr, fp, alias))
         conn.commit()
         conn.close()
 
     def get_contacts(self) -> List[dict]:
         conn = sqlite3.connect(self.db_path)
-        cursor = conn.execute("SELECT peer_address, peer_fingerprint, alias, last_seen, trusted FROM contacts")
-        contacts = [{'address': row[0], 'fingerprint': row[1], 'alias': row[2], 'last_seen': row[3], 'trusted': row[4]} for row in cursor.fetchall()]
+        cur = conn.execute("SELECT peer_address, peer_fingerprint, alias, last_seen, trusted FROM contacts")
+        contacts = [{'address': row[0], 'fingerprint': row[1], 'alias': row[2], 'last_seen': row[3], 'trusted': row[4]} for row in cur.fetchall()]
         conn.close()
         return contacts
 
-    def trust_contact(self, peer_address: str):
+    def trust_contact(self, addr: str):
         conn = sqlite3.connect(self.db_path)
-        conn.execute("UPDATE contacts SET trusted = 1 WHERE peer_address = ?", (peer_address,))
+        conn.execute("UPDATE contacts SET trusted = 1 WHERE peer_address = ?", (addr,))
         conn.commit()
         conn.close()
 
-    def delete_history(self, peer_address: str):
+    def delete_history(self, addr: str):
         conn = sqlite3.connect(self.db_path)
-        conn.execute("DELETE FROM messages WHERE peer_address = ?", (peer_address,))
+        conn.execute("DELETE FROM messages WHERE peer_address = ?", (addr,))
         conn.commit()
         conn.close()
 
     def wipe_all(self):
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA secure_delete = ON")
         conn.execute("DELETE FROM messages")
         conn.execute("DELETE FROM contacts")
+        conn.execute("VACUUM")
         conn.commit()
         conn.close()
         if os.path.exists(self.salt_path):
+            with open(self.salt_path, 'wb') as f:
+                f.write(b'\x00' * 32)
             os.remove(self.salt_path)
