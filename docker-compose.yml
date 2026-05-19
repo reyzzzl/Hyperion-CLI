@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  alice:
+    build: .
+    ports:
+      - "9999:9999"
+    volumes:
+      - ./data/alice:/root/.hyperion
+    stdin_open: true
+    tty: true
+    command: host
