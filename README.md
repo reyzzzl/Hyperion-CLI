@@ -100,7 +100,7 @@ pkg install build-essential cmake openssl git tor python -y
 ### 2. Clone Repository and Install Packages
 ```bash
 # Clone the project code
-git clone [https://github.com/reyzzzl/Hyperion-Chat.git](https://github.com/reyzzzl/Hyperion-Chat.git)
+git clone https://github.com/reyzzzl/Hyperion-CLI.git
 cd Hyperion-Chat
 
 # Install Python module dependencies
