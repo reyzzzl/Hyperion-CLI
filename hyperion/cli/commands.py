@@ -30,10 +30,10 @@ class HyperionCLI:
     def cmd_host(self, args):
         if not self.client:
             self.client = HyperionClient(self._log, self._on_msg, self.data_dir)
-            self.client.set_pwd_cb(self._pwd_cb)
+            self.client.set_password_callback(self._pwd_cb)
             if not os.path.exists(f"{self.data_dir}/messages.db"):
                 pwd = getpass.getpass("Set storage password: ")
-                self.client.set_pwd(pwd)
+                self.client.set_password(pwd)
         print("\033[36m[*] Starting Kyber-512 PQC server...\033[0m")
         def show_addr(addr):
             print(f"\n\033[32m[+] Your address: {addr}\033[0m")
@@ -47,12 +47,12 @@ class HyperionCLI:
             return
         if not self.client:
             self.client = HyperionClient(self._log, self._on_msg, self.data_dir)
-            self.client.set_pwd_cb(self._pwd_cb)
+            self.client.set_password_callback(self._pwd_cb)
             if not os.path.exists(f"{self.data_dir}/messages.db"):
                 pwd = getpass.getpass("Set storage password: ")
-                self.client.set_pwd(pwd)
+                self.client.set_password(pwd)
         print(f"\033[36m[*] Connecting to {args.address}...\033[0m")
-        if self.client.connect(args.address):
+        if self.client.connect_to_peer(args.address):
             print("\033[32m[+] Connected!\033[0m")
             self._chat()
         else:
@@ -62,7 +62,7 @@ class HyperionCLI:
         if not args.path:
             print("\033[31mError: file path required\033[0m")
             return
-        if not self.client or not self.client.active:
+        if not self.client or not self.client.active_session:
             print("\033[31mNot connected\033[0m")
             return
         if not os.path.exists(args.path):
@@ -88,7 +88,7 @@ class HyperionCLI:
 
     def _chat(self):
         print("\n\033[36m[*] Chat mode. Type /help for commands.\033[0m\n")
-        while self.client and self.client.active:
+        while self.client and self.client.active_session:
             try:
                 msg = input("\033[33m[YOU]\033[0m ").strip()
                 if not msg:
@@ -98,24 +98,42 @@ class HyperionCLI:
                 elif msg == '/help':
                     self._help()
                 elif msg == '/sessions':
-                    for s in self.client.sess_mgr.list():
-                        active = " (active)" if self.client.active and self.client.active.peer_address == s['address'] else ""
+                    for s in self.client.session_manager.list_sessions():
+                        active = " (active)" if self.client.active_session and self.client.active_session.peer_address == s['address'] else ""
                         print(f"  {s['address']} - {s['fingerprint']}{active}")
                 elif msg.startswith('/switch '):
-                    self.client.switch(msg[8:])
+                    self.client.switch_session(msg[8:])
                 elif msg == '/contacts':
-                    for c in self.client.storage.get_contacts():
-                        print(f"  {c['address']} - {c['fingerprint']}")
+                    if self.client.storage:
+                        for c in self.client.storage.get_contacts():
+                            print(f"  {c['address']} - {c['fingerprint']}")
                 elif msg.startswith('/send-file '):
                     self.cmd_send_file(type('Args', (), {'path': msg[11:]}))
                 elif msg == '/fingerprint':
-                    print(f"Your: {self.client.fingerprint()}")
-                    if self.client.active:
-                        print(f"Peer: {self.client.active.peer_fingerprint}")
+                    print(f"Your: {self.client.get_fingerprint()}")
+                    if self.client.active_session:
+                        print(f"Peer: {self.client.active_session.peer_fingerprint}")
                 elif msg == '/rekey':
-                    self.client.rekey()
+                    if self.client.rekey():
+                        print("[+] Rekey performed")
+                    else:
+                        print("[-] Cannot rekey")
+                elif msg == '/history' or msg.startswith('/history '):
+                    parts = msg.split()
+                    limit = int(parts[1]) if len(parts) > 1 else 50
+                    if self.client.storage:
+                        history = self.client.storage.get_chat_history(self.client.active_session.peer_address, limit)
+                        if not history:
+                            print("No chat history")
+                        else:
+                            print(f"\n\033[36m=== Chat History ===\033[0m")
+                            for h in reversed(history):
+                                direction = "You" if h['direction'] == 'sent' else "Peer"
+                                print(f"  \033[33m{direction}\033[0m [{h['timestamp']}]: {h['message']}")
+                    else:
+                        print("Storage not initialized")
                 else:
-                    err = self.client.send_msg(msg)
+                    err = self.client.send_message(msg)
                     if err:
                         print(f"\033[31m{err}\033[0m")
             except KeyboardInterrupt:
@@ -131,6 +149,7 @@ class HyperionCLI:
   /send-file <p> - Send file
   /fingerprint   - Show fingerprints
   /rekey         - Rotate keys
+  /history [n]   - Show chat history (default 50)
   /panic         - Wipe all data
   /quit          - Exit
 """)
