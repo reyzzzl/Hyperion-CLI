@@ -32,6 +32,7 @@ class HyperionClient:
         self._receive_thread = None
         self._server_socket = None
         self._rehandshake_lock = threading.RLock()
+        self._old_pqc = None
         if PQC_AVAILABLE:
             self.pqc = PQCKyber()
             self.log_callback("[+] PQC Kyber-512 ready")
@@ -45,6 +46,18 @@ class HyperionClient:
 
     def get_fingerprint(self) -> str:
         return self.identity.get_fingerprint() if self.identity else "No identity"
+
+    def _send_queued_messages(self):
+        if not self.active_session or not self.active_session.ratchet:
+            return
+        queued = self.session_manager.get_queued_messages(self.active_session.peer_address)
+        for q in queued:
+            try:
+                encrypted = json.dumps(self.active_session.ratchet.encrypt(q['message']))
+                self.transport.send_all(encrypted.encode() + self.DELIMITER)
+                self.session_manager.mark_delivered(q['id'])
+            except Exception as e:
+                self.log_callback(f"Failed to send queued: {e}")
 
     def _start_receive_loop(self):
         def receive():
@@ -71,24 +84,24 @@ class HyperionClient:
         decrypted = self.active_session.ratchet.decrypt(json.loads(data.decode()))
         if self.storage:
             self.storage.save_message(self.active_session.peer_address, "received", decrypted)
-        queued = self.session_manager.get_queued_messages(self.active_session.peer_address)
-        for q in queued:
-            self.active_session.ratchet.encrypt(q['message'])
-            self.session_manager.mark_delivered(q['id'])
         self.message_callback(decrypted)
+        self._send_queued_messages()
 
     def _handle_file_data(self, data: bytes):
         if not self.active_session:
             return
-        if data == self.FILE_DELIMITER + b'END' + self.DELIMITER:
+        if data == self.FILE_DELIMITER + b'END':
             if hasattr(self, '_file_transfer'):
                 result = self._file_transfer.finalize_received_file()
                 if result:
                     self.log_callback(f"FILE Saved: {result}")
             self.log_callback("FILE Transfer complete")
         else:
-            meta_str = data[len(self.FILE_DELIMITER):-len(self.DELIMITER)].decode()
-            decrypted = self.active_session.ratchet.decrypt(json.loads(meta_str))
+            if data.startswith(self.FILE_DELIMITER):
+                meta_str = data[len(self.FILE_DELIMITER):]
+            else:
+                meta_str = data
+            decrypted = self.active_session.ratchet.decrypt(json.loads(meta_str.decode()))
             if hasattr(self, '_file_transfer'):
                 self._file_transfer.process_received_data(decrypted)
 
@@ -100,9 +113,10 @@ class HyperionClient:
         with self._rehandshake_lock:
             if not self.active_session:
                 return
-            old_pqc = self.pqc
+            if self._old_pqc:
+                self._old_pqc.cleanup()
+            self._old_pqc = self.pqc
             self.pqc = PQCKyber()
-            self.pqc._init_kem()
             pubkey = self.pqc.get_public_key()
             identity_pub = base64.b64encode(self.identity.get_public_key()).decode()
             identity_sig = base64.b64encode(self.identity.sign((pubkey + identity_pub).encode())).decode()
@@ -126,7 +140,6 @@ class HyperionClient:
             self.log_callback("[!] PQC not available")
             return
         self.log_callback("[*] Generating Kyber-512 keys...")
-        self.pqc._init_kem()
         self.log_callback(f"[*] Identity: {self.get_fingerprint()}")
         self.log_callback("[*] Creating Tor hidden service...")
         tor_hs = TorHiddenService()
@@ -152,11 +165,14 @@ class HyperionClient:
             self.log_callback("[!] PQC not available")
             return False
         existing = self.session_manager.get_session(address)
-        if existing and existing.ratchet:
-            self.log_callback(f"[*] Reusing session with {address}")
+        if existing and existing.ratchet is not None:
+            self.log_callback(f"[*] Reusing existing session with {address}")
             self.active_session = existing
             self._start_receive_loop()
+            self._send_queued_messages()
             return True
+        elif existing and existing.ratchet is None:
+            self.log_callback(f"[*] Found stale session with {address}, re-handshaking...")
         self.log_callback(f"[*] Connecting to {address}...")
         is_onion = '.onion' in address.lower()
         if is_onion:
@@ -176,42 +192,46 @@ class HyperionClient:
         return True
 
     def _complete_handshake(self, peer_address: str = None):
-        handshake = Handshake(self.identity, self.pqc, self.transport)
-        if peer_address:
-            shared_secret, _ = handshake.client_handshake(self.log_callback)
-            root_key = self.pqc.derive_root_key(shared_secret)
-            ratchet = DoubleRatchet(root_key, self._auto_rekey_callback)
-            self.active_session = ChatSession(
-                peer_address=peer_address,
-                peer_fingerprint=handshake.get_peer_fingerprint(),
-                shared_secret=root_key,
-                ratchet=ratchet,
-                last_active=datetime.now()
-            )
-        else:
-            ciphertext = handshake.server_handshake(self.log_callback)
-            kyber_secret = self.pqc.decapsulate(ciphertext)
-            root_key = self.pqc.derive_root_key(kyber_secret)
-            ratchet = DoubleRatchet(root_key, self._auto_rekey_callback)
-            self.active_session = ChatSession(
-                peer_address="unknown",
-                peer_fingerprint=handshake.get_peer_fingerprint(),
-                shared_secret=root_key,
-                ratchet=ratchet,
-                last_active=datetime.now()
-            )
-        self.session_manager.add_session(self.active_session)
-        if self.storage:
-            self.storage.save_contact(self.active_session.peer_address, self.active_session.peer_fingerprint)
-        self._file_transfer = FileTransfer(ratchet, self.log_callback)
-        self.log_callback("[+] Secure channel established")
-        if handshake.verified:
-            self.log_callback(f"[+] Peer verified: {self.active_session.peer_fingerprint}")
-        queued = self.session_manager.get_queued_messages(self.active_session.peer_address)
-        for q in queued:
-            self.send_message(q['message'])
-            self.session_manager.mark_delivered(q['id'])
-        self._start_receive_loop()
+        try:
+            handshake = Handshake(self.identity, self.pqc, self.transport)
+            if peer_address:
+                shared_secret, _ = handshake.client_handshake(self.log_callback)
+                root_key = self.pqc.derive_root_key(shared_secret)
+                ratchet = DoubleRatchet(root_key, self._auto_rekey_callback)
+                self.active_session = ChatSession(
+                    peer_address=peer_address,
+                    peer_fingerprint=handshake.get_peer_fingerprint(),
+                    shared_secret=root_key,
+                    ratchet=ratchet,
+                    last_active=datetime.now()
+                )
+            else:
+                ciphertext = handshake.server_handshake(self.log_callback)
+                kyber_secret = self.pqc.decapsulate(ciphertext)
+                root_key = self.pqc.derive_root_key(kyber_secret)
+                ratchet = DoubleRatchet(root_key, self._auto_rekey_callback)
+                self.active_session = ChatSession(
+                    peer_address="unknown",
+                    peer_fingerprint=handshake.get_peer_fingerprint(),
+                    shared_secret=root_key,
+                    ratchet=ratchet,
+                    last_active=datetime.now()
+                )
+            self.session_manager.add_session(self.active_session)
+            if self.storage:
+                self.storage.save_contact(self.active_session.peer_address, self.active_session.peer_fingerprint)
+            self._file_transfer = FileTransfer(ratchet, self.log_callback)
+            self.log_callback("[+] Secure channel established")
+            if handshake.verified:
+                self.log_callback(f"[+] Peer verified: {self.active_session.peer_fingerprint}")
+            else:
+                self.log_callback("[!] WARNING: Peer verification failed! Possible MITM attack!")
+            self._start_receive_loop()
+            self._send_queued_messages()
+        except ValueError as e:
+            self.log_callback(f"[!] Handshake failed: {e}")
+            self.transport.close()
+            return
 
     def send_message(self, message: str) -> Optional[str]:
         if not self.active_session or not self.active_session.ratchet:
@@ -240,7 +260,7 @@ class HyperionClient:
             self.transport.send_all(self.FILE_DELIMITER + json.dumps(self.active_session.ratchet.encrypt(json.dumps(metadata))).encode() + self.DELIMITER)
             for i, chunk in enumerate(result['chunks']):
                 msg = self._file_transfer.prepare_chunk_message(chunk, i)
-                self.transport.send_all(msg.encode() + self.DELIMITER)
+                self.transport.send_all(self.FILE_DELIMITER + msg.encode() + self.DELIMITER)
             self.transport.send_all(self.FILE_DELIMITER + b'END' + self.DELIMITER)
             return f"File sent: {result['filename']}"
         return result
@@ -249,6 +269,9 @@ class HyperionClient:
         session = self.session_manager.get_session(peer_address)
         if not session:
             self.log_callback(f"[!] No session: {peer_address}")
+            return False
+        if not session.ratchet:
+            self.log_callback(f"[!] Session {peer_address} has no valid ratchet, need re-handshake")
             return False
         self.active_session = session
         self.log_callback(f"[*] Switched to {peer_address}")
@@ -272,6 +295,8 @@ class HyperionClient:
             self.identity.wipe_memory()
         if self.pqc:
             self.pqc.cleanup()
+        if self._old_pqc:
+            self._old_pqc.cleanup()
         if self.session_manager:
             self.session_manager.wipe_all()
         if self.storage:
@@ -284,4 +309,6 @@ class HyperionClient:
         self.running = False
         if self.pqc:
             self.pqc.cleanup()
+        if self._old_pqc:
+            self._old_pqc.cleanup()
         self.transport.close()
