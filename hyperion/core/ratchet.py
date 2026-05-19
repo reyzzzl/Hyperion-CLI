@@ -9,7 +9,9 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 class DoubleRatchet:
-    def __init__(self, root_key: bytes, auto_rekey_callback: Optional[Callable] = None, rekey_interval_messages: int = 100, rekey_interval_seconds: int = 600):
+    def __init__(self, root_key: bytes, auto_rekey_callback: Optional[Callable] = None, 
+                 rekey_interval_messages: int = 100, rekey_interval_seconds: int = 600,
+                 is_initiator: bool = True):
         self.root_key = root_key
         self.send_chain_key = None
         self.recv_chain_key = None
@@ -19,11 +21,23 @@ class DoubleRatchet:
         self.rekey_interval_messages = rekey_interval_messages
         self.rekey_interval_seconds = rekey_interval_seconds
         self._last_rekey_time = time.time()
+        self.is_initiator = is_initiator
         self._init_chains()
 
     def _init_chains(self):
-        self.send_chain_key = HKDF(algorithm=hashes.SHA3_256(), length=32, salt=b'hyperion-send-chain-v1', info=b'double-ratchet-send', backend=default_backend()).derive(self.root_key)
-        self.recv_chain_key = HKDF(algorithm=hashes.SHA3_256(), length=32, salt=b'hyperion-recv-chain-v1', info=b'double-ratchet-recv', backend=default_backend()).derive(self.root_key)
+        key_a = HKDF(algorithm=hashes.SHA3_256(), length=32, 
+                     salt=b'hyperion-send-chain-v1', info=b'double-ratchet-send', 
+                     backend=default_backend()).derive(self.root_key)
+        key_b = HKDF(algorithm=hashes.SHA3_256(), length=32, 
+                     salt=b'hyperion-recv-chain-v1', info=b'double-ratchet-recv', 
+                     backend=default_backend()).derive(self.root_key)
+        
+        if self.is_initiator:
+            self.send_chain_key = key_a
+            self.recv_chain_key = key_b
+        else:
+            self.send_chain_key = key_b
+            self.recv_chain_key = key_a
 
     def _ratchet_chain(self, chain_key: bytes) -> bytes:
         return hashlib.sha3_256(chain_key + b'chain_step').digest()
@@ -41,7 +55,8 @@ class DoubleRatchet:
             self.recv_message_count = 0
 
     def encrypt(self, plaintext: str) -> dict:
-        mk = self._message_key(self.send_chain_key, self.send_message_count)
+        current_counter = self.send_message_count
+        mk = self._message_key(self.send_chain_key, current_counter)
         self.send_chain_key = self._ratchet_chain(self.send_chain_key)
         self.send_message_count += 1
         self._check_rekey()
@@ -54,7 +69,7 @@ class DoubleRatchet:
             'iv': base64.b64encode(iv).decode(),
             'tag': base64.b64encode(enc.tag).decode(),
             'ct': base64.b64encode(ct).decode(),
-            'counter': self.send_message_count - 1
+            'counter': current_counter
         }
 
     def decrypt(self, data: dict) -> str:
@@ -62,14 +77,18 @@ class DoubleRatchet:
         tag = base64.b64decode(data['tag'])
         ct = base64.b64decode(data['ct'])
         rc = data['counter']
+        
         if rc < self.recv_message_count:
-            raise ValueError("Replay attack")
+            raise ValueError(f"Replay attack: received {rc} < {self.recv_message_count}")
+        
         while rc > self.recv_message_count:
             self.recv_chain_key = self._ratchet_chain(self.recv_chain_key)
             self.recv_message_count += 1
+        
         mk = self._message_key(self.recv_chain_key, rc)
         self.recv_chain_key = self._ratchet_chain(self.recv_chain_key)
         self.recv_message_count += 1
+        
         cipher = Cipher(algorithms.AES256(mk), modes.GCM(iv, tag), backend=default_backend())
         dec = cipher.decryptor()
         plaintext = dec.update(ct) + dec.finalize()
