@@ -14,12 +14,10 @@ class FileTransfer:
         self._receiving: Optional[Dict[str, Any]] = None
 
     def encrypt_chunk(self, data_str: str) -> str:
-        encrypted = self.ratchet.encrypt(data_str)
-        return json.dumps(encrypted)
+        return json.dumps(self.ratchet.encrypt(data_str))
 
     def decrypt_chunk(self, enc_data_str: str) -> str:
-        decrypted = self.ratchet.decrypt(json.loads(enc_data_str))
-        return decrypted
+        return self.ratchet.decrypt(json.loads(enc_data_str))
 
     def send_file(self, filepath: str) -> Union[Dict, str]:
         try:
@@ -40,7 +38,13 @@ class FileTransfer:
         try:
             data = json.loads(data_str)
             if data.get('type') == 'file_meta':
-                self._receiving = {'filename': data['filename'], 'size': data['size'], 'chunks': data['chunks'], 'chunks_data': [None] * data['chunks'], 'received_count': 0}
+                self._receiving = {
+                    'filename': data['filename'],
+                    'size': data['size'],
+                    'chunks': data['chunks'],
+                    'chunks_data': [None] * data['chunks'],
+                    'received_count': 0
+                }
                 self.callback(f"FILE Receiving: {data['filename']} ({data['size']} bytes)")
             elif data.get('type') == 'file_chunk' and self._receiving:
                 idx = data['index']
