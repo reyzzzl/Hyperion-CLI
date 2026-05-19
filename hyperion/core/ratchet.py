@@ -41,15 +41,21 @@ class DoubleRatchet:
             self.recv_message_count = 0
 
     def encrypt(self, plaintext: str) -> dict:
-        self._check_rekey()
         mk = self._message_key(self.send_chain_key, self.send_message_count)
         self.send_chain_key = self._ratchet_chain(self.send_chain_key)
         self.send_message_count += 1
+        self._check_rekey()
+        
         iv = secrets.token_bytes(12)
         cipher = Cipher(algorithms.AES256(mk), modes.GCM(iv), backend=default_backend())
         enc = cipher.encryptor()
         ct = enc.update(plaintext.encode()) + enc.finalize()
-        return {'iv': base64.b64encode(iv).decode(), 'tag': base64.b64encode(enc.tag).decode(), 'ct': base64.b64encode(ct).decode(), 'counter': self.send_message_count - 1}
+        return {
+            'iv': base64.b64encode(iv).decode(),
+            'tag': base64.b64encode(enc.tag).decode(),
+            'ct': base64.b64encode(ct).decode(),
+            'counter': self.send_message_count - 1
+        }
 
     def decrypt(self, data: dict) -> str:
         iv = base64.b64decode(data['iv'])
