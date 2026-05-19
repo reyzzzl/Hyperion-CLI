@@ -1,7 +1,7 @@
 import json
 import base64
 import hashlib
-from typing import Tuple, Optional, Callable
+from typing import Tuple, Callable
 from hyperion.core.identity import SecureIdentity
 from hyperion.core.pqc import PQCKyber
 from hyperion.transport.tor_socket import TorSocket
@@ -13,7 +13,6 @@ class Handshake:
         self.identity = identity
         self.pqc = pqc
         self.transport = transport
-        self.peer_identity = None
         self.peer_fingerprint = None
         self.verified = False
 
@@ -26,9 +25,12 @@ class Handshake:
     def _verify_peer(self, peer_data: dict) -> bool:
         peer_identity = base64.b64decode(peer_data['identity_pub'])
         peer_fingerprint = hashlib.sha3_256(peer_identity).hexdigest()[:16]
-        valid = self.identity.verify(base64.b64decode(peer_data['signature']), (peer_data['pqc_pubkey'] + peer_data['identity_pub']).encode(), peer_identity)
+        valid = self.identity.verify(
+            base64.b64decode(peer_data['signature']),
+            (peer_data['pqc_pubkey'] + peer_data['identity_pub']).encode(),
+            peer_identity
+        )
         if valid:
-            self.peer_identity = peer_identity
             self.peer_fingerprint = peer_fingerprint
             self.verified = True
         return valid
