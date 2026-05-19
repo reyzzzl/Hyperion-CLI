@@ -18,14 +18,11 @@ class SecureIdentity:
         self._key: Optional[ed25519.Ed25519PrivateKey] = None
         self._load_or_generate()
 
-    def _default_ask_password(self, prompt: str, title: str) -> Optional[str]:
-        import getpass
-        return getpass.getpass(f"{prompt}: ")
-
     def _ask_password(self, prompt: str, title: str) -> Optional[str]:
         if self.password_callback:
             return self.password_callback(prompt, title)
-        return self._default_ask_password(prompt, title)
+        import getpass
+        return getpass.getpass(f"{prompt}: ")
 
     def _derive_key(self, password: str, salt: bytes) -> bytes:
         kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1, backend=default_backend())
@@ -54,7 +51,7 @@ class SecureIdentity:
                     data = json.load(f)
                 if 'encrypted' in data:
                     for attempt in range(3):
-                        password = self._ask_password(f"Enter identity password (attempt {attempt+1}/3)", "Unlock Identity")
+                        password = self._ask_password(f"Enter identity password (attempt {attempt+1}/3)", "Unlock")
                         if password is None:
                             raise ValueError("Password cancelled")
                         try:
@@ -68,11 +65,15 @@ class SecureIdentity:
             except Exception:
                 pass
         self._key = ed25519.Ed25519PrivateKey.generate()
-        private_bytes = self._key.private_bytes(encoding=serialization.Encoding.Raw, format=serialization.PrivateFormat.Raw, encryption_algorithm=serialization.NoEncryption())
-        password = self._ask_password("Set password for identity storage", "Create Identity")
+        private_bytes = self._key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        password = self._ask_password("Set password for identity storage", "Create")
         if password is None:
             raise ValueError("Password required")
-        confirm = self._ask_password("Confirm password", "Confirm Password")
+        confirm = self._ask_password("Confirm password", "Confirm")
         if confirm is None or password != confirm:
             raise ValueError("Passwords do not match")
         encrypted = self._encrypt_private_key(private_bytes, password)
