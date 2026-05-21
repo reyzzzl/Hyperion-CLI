@@ -143,7 +143,7 @@ python main.py connect 127.0.0.1:9999
 ```bash
 # Bootstrap the Tor background daemon
 tor --ControlPort 9051 --SOCKSPort 9050 &
-
+```
 # Launch Hyperion server node
 python main.py host
 # Share the ephemeral .onion address shown on the viewport
@@ -153,7 +153,7 @@ python main.py host
 ```bash
 # Ensure Tor daemon is active on the client machine
 tor --ControlPort 9051 --SOCKSPort 9050 &
-
+```
 # Bridge connection down the active onion path
 python main.py connect xyz123abc456example.onion
 
