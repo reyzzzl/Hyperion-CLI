@@ -115,22 +115,6 @@ docker run -it --rm hyperion:latest connect 127.0.0.1:9999
 docker run -it --rm --network host hyperion:latest host
 
 ```
-### 3. Deployment via GitHub Codespaces
-```bash
-# Inside the active Codespace terminal instance, spin up Tor:
-sudo apt update && sudo apt install -y tor
-tor --ControlPort 9051 --SOCKSPort 9050 &
-
-# Install package modules
-pip install -r requirements.txt
-
-# Launch host node instance
-python main.py host
-
-# Open a second concurrent terminal tab to bridge client instance:
-python main.py connect 127.0.0.1:9999
-
-```
 ## 🔑 Setup Cryptographic Identity (First Run)
 When launching Hyperion for the first time, you will be prompted to set up two master passwords via terminal prompts:
 ```bash
