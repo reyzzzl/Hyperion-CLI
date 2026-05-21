@@ -91,7 +91,7 @@ You'll need **Python 3.9** or later.
 sudo apt update && sudo apt install -y build-essential cmake libssl-dev git tor python3 python3-pip
 
 ```
-#Clone this repo
+# Clone this repo
 ```bash
 git clone https://github.com/reyzzzl/Hyperion-CLI.git
 
@@ -155,7 +155,7 @@ python main.py host
 ```
  1. **Identity Password:** Protects your Ed25519 private key profile (saved inside ~/.hyperion/hyperion_identity.json).
  2. **Storage Password:** Generates the cryptographic MultiKDF barrier to lock your message history database rows at rest.
-> ⚠️ **CRITICAL WARNING:** Save these passwords securely. There is no back-door, recovery mechanism, or password reset function by design. If lost, your databases will remain permanently bricked.
+> Save these passwords securely. There is no back-door, recovery mechanism, or password reset function by design. If lost, your databases will remain permanently bricked.
 > 
 ## 📡 Operational Connection Examples
 ### Method A: Local Host Loop-back Testing (Dual Terminal Instances)
