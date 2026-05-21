@@ -57,4 +57,51 @@ class DoubleRatchet:
     def encrypt(self, plaintext: str) -> dict:
         current_counter = self.send_message_count
         mk = self._message_key(self.send_chain_key, current_counter)
-        self.send_chain
+        self.send_chain_key = self._ratchet_chain(self.send_chain_key)
+        self.send_message_count += 1
+        self._check_rekey()
+        
+        iv = secrets.token_bytes(12)
+        cipher = Cipher(algorithms.AES256(mk), modes.GCM(iv), backend=default_backend())
+        enc = cipher.encryptor()
+        ct = enc.update(plaintext.encode()) + enc.finalize()
+        return {
+            'iv': base64.b64encode(iv).decode(),
+            'tag': base64.b64encode(enc.tag).decode(),
+            'ct': base64.b64encode(ct).decode(),
+            'counter': current_counter
+        }
+
+    def decrypt(self, data: dict) -> str:
+        iv = base64.b64decode(data['iv'])
+        tag = base64.b64decode(data['tag'])
+        ct = base64.b64decode(data['ct'])
+        rc = data['counter']
+        
+        if rc < self.recv_message_count:
+            raise ValueError(f"Replay attack: received {rc} < {self.recv_message_count}")
+        
+        while rc > self.recv_message_count:
+            self.recv_chain_key = self._ratchet_chain(self.recv_chain_key)
+            self.recv_message_count += 1
+        
+        mk = self._message_key(self.recv_chain_key, rc)
+        self.recv_chain_key = self._ratchet_chain(self.recv_chain_key)
+        self.recv_message_count += 1
+        
+        cipher = Cipher(algorithms.AES256(mk), modes.GCM(iv, tag), backend=default_backend())
+        dec = cipher.decryptor()
+        plaintext = dec.update(ct) + dec.finalize()
+        return plaintext.decode()
+
+    def rekey(self):
+        self.root_key = hashlib.sha3_256(self.root_key + b'rekey').digest()
+        self.send_message_count = 0
+        self.recv_message_count = 0
+        self._init_chains()
+        return True
+
+    def wipe_memory(self):
+        self.root_key = secrets.token_bytes(32)
+        self.send_chain_key = secrets.token_bytes(32)
+        self.recv_chain_key = secrets.token_bytes(32)
