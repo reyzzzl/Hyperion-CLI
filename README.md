@@ -91,7 +91,7 @@ You'll need **Python 3.9** or later.
 sudo apt update && sudo apt install -y build-essential cmake libssl-dev git tor python3 python3-pip
 
 ```
-# Clone this repo
+### Clone this repo
 ```bash
 git clone https://github.com/reyzzzl/Hyperion-CLI.git
 
