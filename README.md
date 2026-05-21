@@ -1,6 +1,6 @@
 # Hyperion PQC
 
-![Status Beta](https://img.shields.io/badge/Status-Beta-red.svg)
+![Status Version](https://img.shields.io/badge/Status-V2-red.svg)
 ![Type CLI--Application](https://img.shields.io/badge/Type-CLI%20Application-blue.svg)
 ![Crypto Kyber--512%20%7C%20ML--KEM](https://img.shields.io/badge/Crypto-Kyber--512%20%7C%20ML--KEM-orange)
 ![Network Tor%20Onion%20Routing](https://img.shields.io/badge/Network-Tor%20Onion%20Routing-purple)
