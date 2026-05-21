@@ -87,7 +87,7 @@ The underlying core Double Ratchet engine now integrates a threading.RLock() (Re
 ## 📥 Installation & Deployment
 ### 1. Native Build from Source
 You'll need **Python 3.9** or later.
-```bash
+```
 sudo apt update && sudo apt install -y build-essential cmake libssl-dev git tor python3 python3-pip
 
 ```
@@ -100,10 +100,12 @@ git clone https://github.com/reyzzzl/Hyperion-CLI.git
 cd Hyperion-CLI
 
 ```
+### Install requirements library
 ```bash
 pip install -r requirements.txt
 
 ```
+### install hyperion 
 ```bash
 pip install .
 
@@ -114,37 +116,19 @@ pip install .
 docker build -t hyperion:latest .
 
 ```
+### Create host docker
 ```bash
 docker run -it --rm -p 9999:9999 hyperion:latest host
 
 ```
+### Connect docker to client
 ```bash
 docker run -it --rm hyperion:latest connect 127.0.0.1:9999
 
 ```
+### Clean docker client
 ```bash
 docker run -it --rm --network host hyperion:latest host
-
-```
-### 3. Deployment via GitHub Codespaces
-```bash
-sudo apt update && sudo apt install -y tor
-
-```
-```bash
-tor --ControlPort 9051 --SOCKSPort 9050 &
-
-```
-```bash
-pip install -r requirements.txt
-
-```
-```bash
-python main.py host
-
-```
-```bash
-python main.py connect 127.0.0.1:9999
 
 ```
 ## 🔑 Setup Cryptographic Identity (First Run)
@@ -216,30 +200,6 @@ Once a secure handshake drops you into the live conversational loop, raw strings
 ```
 *Type 'WIPE' to confirm.*
 > 🔒 **Mandatory Operational Security Task:** After establishing a secure session link, always execute /fingerprint. Compare the 16-character string printed for your peer via an independent **Out-of-Band Channel** (such as a voice call or physical reading) to verify the line is clean and completely immune to active interception attempts.
-> 
-## 📂 Project Structure
-```text
-hyperion/
-├── core/
-│   ├── client.py        # Main client logic
-│   ├── ratchet.py       # Double Ratchet with PFS & threading.RLock()
-│   ├── identity.py      # Ed25519 + encrypted storage mechanics
-│   ├── pqc.py           # Kyber-512 + Dilithium5 + MultiKDF matrix
-│   ├── session.py       # Session manager engine (SQLite)
-│   └── storage.py       # Encrypted message storage layer
-├── transport/
-│   └── tor_socket.py    # Tor socket wrappers + hidden service compiler
-├── protocol/
-│   └── handshake.py     # PQC + identity verification handshake logic
-├── transfer/
-│   └── file_transfer.py # File chunking and reassembly pipelines
-├── cli/
-│   └── commands.py      # Terminal command matrix parser
-├── Dockerfile
-├── requirements.txt
-└── main.py
-
-```
 ## 🛑 Known Limitations
  * **File Transfer Thresholds:** File transmission operates over fixed 512 KB chunk segments.
  * **Payload Constraints:** Maximum hardcoded packet message buffer boundary is set to 50 MB.
