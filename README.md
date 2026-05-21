@@ -82,7 +82,6 @@ The underlying core Double Ratchet engine now integrates a threading.RLock() (Re
  * **No central servers** – pure peer-to-peer deployment via Tor or direct loop-back IP.
 ## 💻 Supported Environments
  * **VPS (Ubuntu/Debian):** Recommended deployment target. Supports background Tor services natively.
- * **Termux (Android):** No root required. Fully functional post-quantum terminal environment.
  * **Local Linux / macOS / Windows (WSL):** Ideal environment for rapid testing, structural auditing, and development.
 ## 📥 Installation & Deployment
 ### 1. Native Build from Source
@@ -123,7 +122,7 @@ python main.py host
 ```
  1. **Identity Password:** Protects your Ed25519 private key profile (saved inside ~/.hyperion/hyperion_identity.json).
  2. **Storage Password:** Generates the cryptographic MultiKDF barrier to lock your message history database rows at rest.
-> ⚠️ **CRITICAL WARNING:** Save these passwords securely. There is no back-door, recovery mechanism, or password reset function by design. If lost, your databases will remain permanently bricked.
+> Save these passwords securely. There is no back-door, recovery mechanism, or password reset function by design. If lost, your databases will remain permanently bricked.
 > 
 ## 📡 Operational Connection Examples
 ### Method A: Local Host Loop-back Testing (Dual Terminal Instances)
@@ -175,30 +174,7 @@ Once a secure handshake drops you into the active conversational loop, raw strin
 | /panic | Emergency wipe — delete all cryptographic keys, databases, and drop the application. |
 | /quit or /exit | Gracefully drops active socket lanes and exits the application window. |
 > 🔒 **Mandatory Operational Security Task:** After establishing a secure session link, always execute /fingerprint. Compare the 16-character string printed for your peer via an independent **Out-of-Band Channel** (such as a voice call or physical reading) to verify the line is clean and completely immune to active interception attempts.
-> 
-## 📂 Project Structure
-```text
-hyperion/
-├── core/
-│   ├── client.py        # Main client logic
-│   ├── ratchet.py       # Double Ratchet with PFS & threading.RLock()
-│   ├── identity.py      # Ed25519 + encrypted storage mechanics
-│   ├── pqc.py           # Kyber-512 + Dilithium5 + MultiKDF matrix
-│   ├── session.py       # Session manager engine (SQLite)
-│   └── storage.py       # Encrypted message storage layer
-├── transport/
-│   └── tor_socket.py    # Tor socket wrappers + hidden service compiler
-├── protocol/
-│   └── handshake.py     # PQC + identity verification handshake logic
-├── transfer/
-│   └── file_transfer.py # File chunking and reassembly pipelines
-├── cli/
-│   └── commands.py      # Terminal command matrix parser
-├── Dockerfile
-├── requirements.txt
-└── main.py
 
-```
 ## 🛑 Known Limitations
  * **File Transfer Thresholds:** File transmission operates over fixed 512 KB chunk segments.
  * **Payload Constraints:** Maximum hardcoded packet message buffer boundary is set to 50 MB.
