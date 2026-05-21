@@ -2,7 +2,6 @@
 import os
 import sys
 import argparse
-import threading
 import getpass
 from pathlib import Path
 
@@ -18,14 +17,14 @@ class HyperionCLI:
         os.makedirs(self.data_dir, exist_ok=True)
 
     def _log(self, msg):
-        print(f"\033[36m[LOG]\033[0m {msg}")
+        pass
 
     def _on_msg(self, msg):
-        print(f"\n\033[32m[PEER]\033[0m {msg}")
-        print("\033[33m[YOU]\033[0m ", end='', flush=True)
+        print(f"\n[PEER] {msg}")
+        print("[YOU] ", end='', flush=True)
 
     def _pwd_cb(self, prompt, title):
-        return getpass.getpass(f"\033[33m{prompt}: \033[0m")
+        return getpass.getpass(f"{prompt}: ")
 
     def cmd_host(self, args):
         if not self.client:
@@ -34,16 +33,16 @@ class HyperionCLI:
             if not os.path.exists(f"{self.data_dir}/messages.db"):
                 pwd = getpass.getpass("Set storage password: ")
                 self.client.set_password(pwd)
-        print("\033[36m[*] Starting Kyber-512 PQC server...\033[0m")
+        print("[*] Starting Kyber-512 PQC server...")
         def show_addr(addr):
-            print(f"\n\033[32m[+] Your address: {addr}\033[0m")
+            print(f"\n[+] Your address: {addr}")
             print("[*] Share this with your peer")
         self.client.start_server(show_addr)
         self._chat()
 
     def cmd_connect(self, args):
         if not args.address:
-            print("\033[31mError: address required\033[0m")
+            print("Error: address required")
             return
         if not self.client:
             self.client = HyperionClient(self._log, self._on_msg, self.data_dir)
@@ -51,30 +50,30 @@ class HyperionCLI:
             if not os.path.exists(f"{self.data_dir}/messages.db"):
                 pwd = getpass.getpass("Set storage password: ")
                 self.client.set_password(pwd)
-        print(f"\033[36m[*] Connecting to {args.address}...\033[0m")
+        print(f"[*] Connecting to {args.address}...")
         if self.client.connect_to_peer(args.address):
-            print("\033[32m[+] Connected!\033[0m")
+            print("[+] Connected!")
             self._chat()
         else:
-            print("\033[31m[!] Failed\033[0m")
+            print("[!] Failed")
 
     def cmd_send_file(self, args):
         if not args.path:
-            print("\033[31mError: file path required\033[0m")
+            print("Error: file path required")
             return
         if not self.client or not self.client.active_session:
-            print("\033[31mNot connected\033[0m")
+            print("Not connected")
             return
         if not os.path.exists(args.path):
-            print(f"\033[31mFile not found: {args.path}\033[0m")
+            print(f"File not found: {args.path}")
             return
-        print(f"\033[36m[*] Sending: {os.path.basename(args.path)}...\033[0m")
+        print(f"[*] Sending: {os.path.basename(args.path)}...")
         res = self.client.send_file(args.path)
         if res:
-            print(f"\033[32m{res}\033[0m")
+            print(res)
 
     def cmd_panic(self, args):
-        print("\033[31m[!] PANIC - Wipe all data\033[0m")
+        print("[!] PANIC - Wipe all data")
         confirm = input("Type 'WIPE' to confirm: ")
         if confirm != 'WIPE':
             print("Cancelled")
@@ -83,14 +82,14 @@ class HyperionCLI:
             self.client.panic()
         import shutil
         shutil.rmtree(self.data_dir, ignore_errors=True)
-        print("\033[32m[+] All data wiped\033[0m")
+        print("[+] All data wiped")
         sys.exit(0)
 
     def _chat(self):
-        print("\n\033[36m[*] Chat mode. Type /help for commands.\033[0m\n")
+        print("\n[*] Chat mode. Type /help for commands.\n")
         while self.client and self.client.active_session:
             try:
-                msg = input("\033[33m[YOU]\033[0m ").strip()
+                msg = input("[YOU] ").strip()
                 if not msg:
                     continue
                 if msg in ['/quit', '/exit']:
@@ -126,23 +125,23 @@ class HyperionCLI:
                         if not history:
                             print("No chat history")
                         else:
-                            print(f"\n\033[36m=== Chat History ===\033[0m")
+                            print(f"\n=== Chat History ===")
                             for h in reversed(history):
                                 direction = "You" if h['direction'] == 'sent' else "Peer"
-                                print(f"  \033[33m{direction}\033[0m [{h['timestamp']}]: {h['message']}")
+                                print(f"  {direction} [{h['timestamp']}]: {h['message']}")
                     else:
                         print("Storage not initialized")
                 else:
                     err = self.client.send_message(msg)
                     if err:
-                        print(f"\033[31m{err}\033[0m")
+                        print(err)
             except KeyboardInterrupt:
                 break
-        print("\n\033[36m[*] Chat ended\033[0m")
+        print("\n[*] Chat ended")
 
     def _help(self):
         print("""
-\033[36mCommands:\033[0m
+Commands:
   /sessions      - List sessions
   /switch <addr> - Switch session
   /contacts      - List contacts
