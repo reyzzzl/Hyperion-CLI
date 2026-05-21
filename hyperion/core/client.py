@@ -2,7 +2,6 @@ import json
 import threading
 import socket
 import base64
-import time
 from typing import Callable, Optional, List
 from datetime import datetime
 from hyperion.core.identity import SecureIdentity
@@ -62,12 +61,9 @@ class HyperionClient:
 
     def _start_receive_loop(self):
         def receive():
-            print("[DEBUG] Receive loop started", flush=True)
             while self.running:
                 try:
                     data = self.transport.recv_all_until()
-                    print(f"[DEBUG] Received {len(data)} bytes", flush=True)
-                    
                     if data.startswith(self.FILE_DELIMITER):
                         self._handle_file_data(data)
                     elif data.startswith(self.REHANDSHAKE_DELIMITER):
@@ -77,9 +73,6 @@ class HyperionClient:
                 except socket.timeout:
                     continue
                 except Exception as e:
-                    print(f"[DEBUG] Receive error: {e}", flush=True)
-                    import traceback
-                    traceback.print_exc()
                     if self.running:
                         self.log_callback(f"Receive error: {e}")
         self._receive_thread = threading.Thread(target=receive, daemon=True)
@@ -87,21 +80,15 @@ class HyperionClient:
 
     def _handle_message(self, data: bytes):
         if not self.active_session:
-            print("[DEBUG] No active session", flush=True)
             return
         try:
-            msg_str = data.decode()
-            print(f"[DEBUG] Raw message: {msg_str[:100]}", flush=True)
-            decrypted = self.active_session.ratchet.decrypt(json.loads(msg_str))
-            print(f"[DEBUG] Decrypted: {decrypted}", flush=True)
+            decrypted = self.active_session.ratchet.decrypt(json.loads(data.decode()))
             if self.storage:
                 self.storage.save_message(self.active_session.peer_address, "received", decrypted)
             self.message_callback(decrypted)
             self._send_queued_messages()
         except Exception as e:
-            print(f"[DEBUG] Message error: {e}", flush=True)
-            import traceback
-            traceback.print_exc()
+            self.log_callback(f"Message error: {e}")
 
     def _handle_file_data(self, data: bytes):
         if not self.active_session:
@@ -260,13 +247,11 @@ class HyperionClient:
             return "Not connected"
         try:
             encrypted = json.dumps(self.active_session.ratchet.encrypt(message))
-            print(f"[DEBUG] Sending encrypted: {encrypted[:100]}", flush=True)
             self.transport.send_all(encrypted.encode() + self.DELIMITER)
             if self.storage:
                 self.storage.save_message(self.active_session.peer_address, "sent", message)
             return None
         except Exception as e:
-            print(f"[DEBUG] Send error: {e}", flush=True)
             if self.active_session:
                 self.session_manager.queue_message(self.active_session.peer_address, message)
                 return f"Message queued: {e}"
