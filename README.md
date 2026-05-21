@@ -1,13 +1,12 @@
 # Hyperion PQC
-> bugs are being fixed, please don't install yet 
 
-![Status Update](https://img.shields.io/badge/Status-v2-red.svg)
+![Status Production](https://img.shields.io/badge/Status-V2-red.svg)
 ![Type CLI--Application](https://img.shields.io/badge/Type-CLI%20Application-blue.svg)
 ![Crypto Kyber--512%20%7C%20ML--KEM](https://img.shields.io/badge/Crypto-Kyber--512%20%7C%20ML--KEM-orange)
 ![Network Tor%20Onion%20Routing](https://img.shields.io/badge/Network-Tor%20Onion%20Routing-purple)
 ![Python Version](https://img.shields.io/badge/Python-3.9+-blue)
 
-**Post-Quantum Encrypted Messenger — Built for the Open Internet**
+**Post-Quantum Encrypted Messenger — CLI-based, Tor-enabled, Quantum-Resistant**
 
 ---
 
@@ -17,7 +16,7 @@
 
 **Hyperion** is a peer-to-peer encrypted messenger built around one idea: *your conversations belong to you, and only you.* It uses **post-quantum cryptography** — the kind that stays secure even against future quantum computers — combined with **onion routing via Tor** to give you a private channel that's both technically strong and philosophically honest.
 
-Hyperion v2.0.0 has been completely overhauled into a fully modular Python package featuring an interactive CLI terminal interface, encrypted local persistent databases, offline message queues, and a multi-factor key derivation architecture.
+Hyperion v2.0.0 runs entirely in the terminal, requires no central server, and introduces structural session persistence, offline message queues, and a multi-factor key derivation architecture.
 
 Everything here is open source under **GPL-3.0**. You can read it, run it, audit it, fork it, break it, and improve it.
 
@@ -26,7 +25,7 @@ Everything here is open source under **GPL-3.0**. You can read it, run it, audit
 ## ⚡ v2.0.0 New Features & Innovations
 
 ### 1. Complete Post-Quantum Cryptography (PQC) Stack
-Hyperion now utilizes a dual-layer quantum security ecosystem via `liboqs` to resist both classical attacks and future quantum decryption vectors (Shor's and Grover's algorithms).
+Hyperion utilizes a dual-layer quantum security ecosystem via `liboqs` to resist both classical attacks and future quantum decryption vectors (Shor's and Grover's algorithms).
 
 | Component | Legacy Framework | Hyperion v2.0.0 (Current) | Quantum Resistance |
 | :--- | :--- | :--- | :--- |
@@ -67,183 +66,160 @@ To maximize Perfect Forward Secrecy, key rotation is executed asynchronously in 
 | **Manual Override** | Executed instantly by running the /rekey command. |
 ### 6. Deadlock-Free Double Ratchet
 The underlying core Double Ratchet engine now integrates a threading.RLock() (Reentrant Lock) architecture. This patch eliminates race conditions and potential thread deadlocks when multiple automated triggers attempt to spin up a background re-handshake concurrently.
-## 🛠️ Cryptographic Stack
+## 🛠️ Cryptographic Stack & Security Notes
 | Primitive / Protocol | Role | Details & Context |
 |---|---|---|
-| **CRYSTALS-Kyber (Kyber-512)** | Key Enapsulation (KEM) | Based on Module Learning With Errors (MLWE). Standardized as **FIPS 203**. Implemented via liboqs. |
+| **CRYSTALS-Kyber (Kyber-512)** | Key Encapsulation (KEM) | Based on Module Learning With Errors (MLWE). Standardized as **FIPS 203**. Implemented via liboqs. |
 | **Double Ratchet** | Symmetric Key Management | Inspired by Signal Protocol. Hashes chain keys forward with SHA3-256 after every message to prevent backward reconstruction. |
 | **AES-256-GCM** | Authenticated Encryption | Provides confidentiality and integrity. The authentication tag is verified *before* decryption to prevent tampering. |
 | **Ed25519** | Identity Signatures | Signs the handshake payload to prevent Man-in-the-Middle (MitM) attacks. Fast, compact, and trusted. |
 | **MultiKDF (Argon2 / Scrypt / PBKDF2)** | Master Key Derivation | Cascades three hardened functions via XOR mapping (Argon2id ^ Scrypt ^ PBKDF2) to encrypt database headers at rest. |
 | **SQLite3 (AES-256-GCM Layer)** | Encrypted Local Storage | Encrypts rows for transaction history (hyperion_messages.db) and sessions (hyperion_sessions.db) on disk. |
+ * All messages are end-to-end encrypted with **AES-256-GCM**.
+ * Perfect Forward Secrecy is strictly enforced via the **Double Ratchet** algorithm.
+ * Identity keys are stored encrypted with **Scrypt + AES-256-GCM** wrappers.
+ * The panic button instantly overwrites keys in RAM and shreds local databases on disk.
+ * **No central servers** – pure peer-to-peer deployment via Tor or direct loop-back IP.
 ## 💻 Supported Environments
-| Environment | Status | Configuration Notes |
-|---|---|---|
-| **VPS (Ubuntu/Debian)** | ✅ Full | Recommended deployment target. Supports background Tor services natively. |
-| **Termux (Android)** | ✅ Full | No root required. Fully functional post-quantum terminal environment. |
-| **Local Linux / macOS** | ✅ Full | Ideal environment for rapid testing, structural auditing, and development. |
-## 📥 Section 1: Installation & Deployment
-Hyperion requires **Python 3.9** or later.
-### 1. Install System Dependencies
-The core component liboqs-python compiles native C bindings from the *Open Quantum Safe* project. You must configure your environment with compilation tools before fetching requirements.
- * **Ubuntu / Debian / Linux VPS:**
+ * **VPS (Ubuntu/Debian):** Recommended deployment target. Supports background Tor services natively.
+ * **Termux (Android):** No root required. Fully functional post-quantum terminal environment.
+ * **Local Linux / macOS / Windows (WSL):** Ideal environment for rapid testing, structural auditing, and development.
+## 📥 Installation & Deployment
+### 1. Native Build from Source
+You'll need **Python 3.9** or later.
 ```bash
-sudo apt-get update
-sudo apt-get install -y build-essential cmake libssl-dev git tor
+# Install system dependencies (Ubuntu/Debian)
+sudo apt update && sudo apt install -y build-essential cmake libssl-dev git tor python3 python3-pip
 
-```
- * **Android Termux:**
-```bash
-pkg update && pkg upgrade -y
-pkg install build-essential cmake openssl git tor python -y
+# Clone the repository
+git clone [https://github.com/reyzzzl/Hyperion-CLI.git](https://github.com/reyzzzl/Hyperion-CLI.git)
+cd Hyperion-CLI
 
-```
-### 2. Clone Repository and Install Packages
-```bash
-# Clone the project code
-git clone https://github.com/reyzzzl/Hyperion-CLI.git
-cd Hyperion-Chat
-
-# Install Python module dependencies
-pip install liboqs-python cryptography pysocks stem argon2-cffi
-
-# Build and register the package globally
+# Install Python modules and compile liboqs (Takes 3-5 minutes)
+pip install -r requirements.txt
 pip install .
 
 ```
-*(Note: Compiling liboqs-python can take roughly 3–5 minutes as it compiles native cryptographic structures from source).*
-### 3. Verify Installation Integrity
-Confirm all post-quantum wrappers and cryptographic modules have integrated correctly into your machine:
+### 2. Deployment via Docker (Recommended)
 ```bash
-python3 -c "
-from hyperion.core.pqc import PQC_AVAILABLE
-from hyperion.core.ratchet import DoubleRatchet
-from hyperion.core.identity import SecureIdentity
-print('PQC Kyber-512 Status:', PQC_AVAILABLE)
-print('System Modules Status: OK')
-"
+# Build the local Docker image
+docker build -t hyperion:latest .
+
+# Run as host (Server Mode)
+docker run -it --rm -p 9999:9999 hyperion:latest host
+
+# Run as client (Connect to Peer)
+docker run -it --rm hyperion:latest connect 127.0.0.1:9999
+
+# Run with Tor support (Host Network Mode)
+docker run -it --rm --network host hyperion:latest host
 
 ```
-**Expected Terminal Output:**
-```text
-PQC Kyber-512 Status: True
-System Modules Status: OK
-
-```
-## 🔑 Section 2: Setup Cryptographic Identity (First Run)
-When launching Hyperion for the first time, you must provision security access passphrases. These passes wrap your long-term Ed25519 profile signatures and local SQLite rows at rest:
+### 3. Deployment via GitHub Codespaces
 ```bash
-python3 main.py host
-
-```
-**Interactive Configuration Prompt Sequence:**
-```text
-Set password for identity storage: [Type master password - characters hidden]
-Confirm password:                  [Retype master password]
-Set storage password:              [Type local message database encryption passphrase]
-
-```
-> ⚠️ **CRITICAL WARNING:** There is no back-door or recovery mechanism for these passphrases. If lost, your databases will remain permanently bricked.
->  * Private profiles partition localized states inside ~/.hyperion/hyperion_identity.json.
-> 
-## 📡 Section 3: Operational Connectivity Guides
-Hyperion supports two core connection methods out of the box: Local Mode (for testing on the same machine/network) and Tor Onion Mode (for decentralized, anonymous wide-area connections).
-### Method A: Local Host Loop-back Testing (Single Machine, Dual Tabs)
-The fastest approach to verify code execution without relying on live external networks:
- * **Terminal Tab 1 — Local Server Listener Host:**
-```bash
-python3 main.py host
-
-```
-*Expected Display Response:*
-```text
-[LOG] [+] PQC Kyber-512 available
-Enter identity password: [Type your password]
-[*] Starting Kyber-512 PQC server...
-[LOG] [*] Generating Kyber-512 keys...
-[LOG] [*] Identity: [Your-16-Character-Hex-ID]
-[LOG] [!] Tor not available, using local mode
-[+] Your address: 127.0.0.1:9999
-[*] Share this with your peer
-[*] Waiting for connection...
-
-```
-*Note down the local listener address parameter generated (e.g., 127.0.0.1:9999).*
- * **Terminal Tab 2 — Client Connection Instance:**
-```bash
-python3 main.py connect 127.0.0.1:9999
-
-```
-*Expected Display Response:*
-```text
-[LOG] [+] PQC Kyber-512 available
-Enter identity password: [Type your password]
-[LOG] [*] Connecting to 127.0.0.1:9999...
-[LOG] [+] Connected directly
-[LOG] [*] PQC handshake in progress...
-[LOG] [+] Peer verified: [Remote-16-Character-Hex-ID]
-[LOG] [+] Secure channel established
-[+] Connected! Secure channel established.
-[*] Entering chat mode. Type '/help' for commands.
-
-[YOU] 
-
-```
-### Method B: Anonymized Onion Routing Mode (Live Tor Circuit)
-For maximum production-grade operational protection across VPS or mobile Termux systems, interact across native hidden service lines.
- 1. Turn on and bootstrap your background Tor routing engine interface:
-```bash
+# Inside the active Codespace terminal instance, spin up Tor:
+sudo apt update && sudo apt install -y tor
 tor --ControlPort 9051 --SOCKSPort 9050 &
 
+# Install package modules
+pip install -r requirements.txt
+
+# Launch host node instance
+python main.py host
+
+# Open a second concurrent terminal tab to bridge client instance:
+python main.py connect 127.0.0.1:9999
+
 ```
-*Wait for the internal stream log to push past setup constraints:* Bootstrapped 100% (done).
- 2. **Spin up onion host parameters:**
+## 🔑 Setup Cryptographic Identity (First Run)
+When launching Hyperion for the first time, you will be prompted to set up two master passwords via terminal prompts:
 ```bash
-python3 main.py host
+python main.py host
 
 ```
-The client triggers structural rules via the stem engine controller, talks to your local Tor daemon, registers an ephemeral hidden site, and returns a .onion configuration string address to share:
-```text
-[+] Your address: abc123xyz456example.onion
-
-```
- 3. **Establish Client Peer Link:** Ensure the connecting peer also has an active Tor daemon listening locally, then bridge directly using the .onion address:
+ 1. **Identity Password:** Protects your Ed25519 private key profile (saved inside ~/.hyperion/hyperion_identity.json).
+ 2. **Storage Password:** Generates the cryptographic MultiKDF barrier to lock your message history database rows at rest.
+> ⚠️ **CRITICAL WARNING:** Save these passwords securely. There is no back-door, recovery mechanism, or password reset function by design. If lost, your databases will remain permanently bricked.
+> 
+## 📡 Operational Connection Examples
+### Method A: Local Host Loop-back Testing (Dual Terminal Instances)
+ * **Terminal 1 – Host Node:**
 ```bash
-python3 main.py connect abc123xyz456example.onion
+python main.py host
+# Wait for authorization and network bind: [+] Your address: 127.0.0.1:9999
 
 ```
-## 🛠️ Section 4: Chat Shell Control Directives
-Once a secure handshake drops you into the live conversational loop, raw strings passed into the entry prompt are automatically wrapped inside the active ratchet and dispatched. Input sequences prefixed with a forward slash (/) trigger operational system modules:
+ * **Terminal 2 – Client Link:**
+```bash
+python main.py connect 127.0.0.1:9999
+# Enter passwords to initialize the secure PQC handshake loop.
+
+```
+### Method B: Anonymous Communication via Tor Hidden Circuits
+ * **Terminal 1 – Hidden Service Host:**
+```bash
+# Bootstrap the Tor background daemon
+tor --ControlPort 9051 --SOCKSPort 9050 &
+
+# Launch Hyperion server node
+python main.py host
+# Share the ephemeral .onion address shown on the viewport
+
+```
+ * **Terminal 2 – Client Connection Instance:**
+```bash
+# Ensure Tor daemon is active on the client machine
+tor --ControlPort 9051 --SOCKSPort 9050 &
+
+# Bridge connection down the active onion path
+python main.py connect xyz123abc456example.onion
+
+```
+## 🛠️ Chat Shell Control Directives
+Once a secure handshake drops you into the active conversational loop, raw strings passed into the entry prompt are automatically wrapped inside the active ratchet and dispatched. Input sequences prefixed with a forward slash (/) trigger operational system modules:
 | Terminal Command | Action Description |
 |---|---|
-| /help | Renders the inline interactive usage and features manual. |
+| /sessions | Inspect all tracked sessional structures cached on disk. |
+| /switch <address> | Hot-swap the current input display focus to a different peer address. |
+| /contacts | Pull up the contact database showing aliases and verified trust signatures. |
+| /alias <address> <name> | Assign a human-readable name string to a complex network address target. |
+| /trust <address> | Manually sign a peer contact as an explicitly trusted node. |
+| /history [n] | Decrypt and output stored database message records up to n rows (Default: 50). |
+| /send-file <path> | Chunks, encrypts, and pipes target files across the active PQC channel (e.g., /send-file /path/to/document.pdf). |
 | /fingerprint | Prints local and remote Ed25519 identity verification hash strings. |
 | /rekey | Instantly forces an explicit rotation step across the main root key arrays. |
-| /history [limit] | Extracts and decrypts database message records up to the specified row limit (e.g., /history 20). |
-| /contacts | Pulls out saved contact address rows, aliases, and trust markers. |
-| /trust <address> | Marks an entry address as an explicitly trusted node in your data tables. |
-| /alias <address> <name> | Binds a recognizable descriptive text tag to a complex connection address string. |
-| /sessions | Lists all structural background session profiles stored in cache. |
-| /switch <address> | Hot-swaps the current chat frame focus over to a different tracked session state. |
-| /send-file <path> | Segments, delete keys, encrypts, and pipes target files across the ratchet into the peer's directory. |
-| /status | Outputs sessional diagnostic status vectors, metrics, and indicators. |
-| /panic | Instantly executes a memory wipe array, kills background threads, purges SQLite databases, and drops the process. |
-| /quit or /exit | Gracefully drops active socket lanes and returns you to standard system shell configurations. |
+| /panic | Emergency wipe — delete all cryptographic keys, databases, and drop the application. |
+| /quit or /exit | Gracefully drops active socket lanes and exits the application window. |
 > 🔒 **Mandatory Operational Security Task:** After establishing a secure session link, always execute /fingerprint. Compare the 16-character string printed for your peer via an independent **Out-of-Band Channel** (such as a voice call or physical reading) to verify the line is clean and completely immune to active interception attempts.
 > 
-## 🔒 Storage Architecture & Threat Model
-### Local Footprint Layout
-Hyperion segregates components on disk to enforce strict cryptographic boundaries:
- * hyperion_messages.db ──> Protected via hybrid **AES-256-GCM** encryption.
- * hyperion_sessions.db ──> Plaintext SQLite (stores non-sensitive operational metadata only).
- * hyperion_identity.json ──> Hardened via **Scrypt + AES-256-GCM** wrappers.
-### Emergency Panic Button
-Executing /panic triggers a complete zeroization protocol:
+## 📂 Project Structure
 ```text
-/panic ──> Secure memory scrub (RAM keys wiped) ──> Disk database scrubbing (Shreds keys) ──> Hard Exit
+hyperion/
+├── core/
+│   ├── client.py        # Main client logic
+│   ├── ratchet.py       # Double Ratchet with PFS & threading.RLock()
+│   ├── identity.py      # Ed25519 + encrypted storage mechanics
+│   ├── pqc.py           # Kyber-512 + Dilithium5 + MultiKDF matrix
+│   ├── session.py       # Session manager engine (SQLite)
+│   └── storage.py       # Encrypted message storage layer
+├── transport/
+│   └── tor_socket.py    # Tor socket wrappers + hidden service compiler
+├── protocol/
+│   └── handshake.py     # PQC + identity verification handshake logic
+├── transfer/
+│   └── file_transfer.py # File chunking and reassembly pipelines
+├── cli/
+│   └── commands.py      # Terminal command matrix parser
+├── Dockerfile
+├── requirements.txt
+└── main.py
 
 ```
-*Once executed, no recoverable cryptographic sessional data or private master identity states remain on the hardware platform.*
+## 🛑 Known Limitations
+ * **File Transfer Thresholds:** File transmission operates over fixed 512 KB chunk segments.
+ * **Payload Constraints:** Maximum hardcoded packet message buffer boundary is set to 50 MB.
+ * **Tor Propagation Latency:** Ephemeral hidden service generation hooks take roughly 5–10 seconds to publish to the Tor network circuit.
+ * **Build Compilation Requirements:** First run requires a global C-compiler setup to build the native liboqs footprint wrapper (takes 3–5 minutes).
 ## 📊 Feature Comparison Matrix
 | Application Feature | Signal Messenger | WhatsApp | Telegram | Hyperion PQC v2.0.0 |
 |---|---|---|---|---|
@@ -252,34 +228,17 @@ Executing /panic triggers a complete zeroization protocol:
 | **Offline Messaging Queue** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ **Yes** |
 | **Encrypted Database History** | ✅ Yes | ✅ Yes | ❌ No | ✅ **Yes (AES-256-GCM Layer)** |
 | **Native Storage Panic Button** | ❌ No | ❌ No | ❌ No | ✅ **Yes (Memory + Disk Wipe)** |
-## 🧹 Section 5: Factory Reset & Clean Purge
-To completely wipe all metadata history logs, clear active contact tables, zeroize identity parameter stores, and return the application workspace environment to a factory-blank status:
-```bash
-# Erase user profile hidden configuration cache directories
-rm -rf ~/.hyperion/
-
-# Wipe databases, salt containers, and identities from the active source directory
-rm -f hyperion_*.db hyperion_*.salt hyperion_identity.json
-
-```
-## 📊 Summary of Absolute Quick-Start Commands
-```bash
-# Build (Run once)
-sudo apt install build-essential cmake libssl-dev tor -y
-pip install liboqs-python cryptography pysocks stem argon2-cffi
-git clone [https://github.com/reyzzzl/Hyperion-Chat.git](https://github.com/reyzzzl/Hyperion-Chat.git)
-cd Hyperion-Chat && pip install .
-
-# Launch Listener Node
-python3 main.py host
-
-# Launch Link Operator
-python3 main.py connect <target_address_or_onion_string>
-
-# Sudden Wiped Emergency Kill
-python3 main.py panic
-
-```
+## 🔍 Troubleshooting
+ * **"Connection refused"** ──> Ensure the host node instance is currently active, listening, and your network interface binding address parameters are typed correctly.
+ * **"Peer verification failed"** ──> Potential active Man-in-the-Middle (MITM) hijacking attempt detected. Drop the circuit immediately and verify the identity fingerprints over an out-of-band communication channel.
+ * **"liboqs not found"** ──> The Python binding failed to link to native workspace components. Execute pip install liboqs-python manually or wait for the compiler to complete tracking operations.
+ * **Messages not sending / State Desync** ──> Clear local runtime tracking footprints entirely and restart the node loops across both communication endpoints:
+   ```bash
+   rm -rf ~/.hyperion/
+   
+   ```
+## 🤝 Contributing & Bug Reports
+Issues and pull requests are highly welcome. If you catch a functional bug, a visual glitch, or a deep architectural flaw, please open a detailed diagnostic ticket via **GitHub Issues**.
 ## 📚 References & Further Reading
 
 These resources serve as the architectural foundation for Hyperion:
