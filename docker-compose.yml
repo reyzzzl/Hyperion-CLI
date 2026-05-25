@@ -1,7 +1,9 @@
 version: '3.8'
+
 services:
   alice:
     build: .
+    container_name: hyperion-alice
     ports:
       - "9999:9999"
     volumes:
@@ -9,3 +11,22 @@ services:
     stdin_open: true
     tty: true
     command: host
+    networks:
+      - hyperion_net
+
+  bob:
+    build: .
+    container_name: hyperion-bob
+    volumes:
+      - ./data/bob:/root/.hyperion
+    stdin_open: true
+    tty: true
+    command: connect alice:9999
+    depends_on:
+      - alice
+    networks:
+      - hyperion_net
+
+networks:
+  hyperion_net:
+    driver: bridge
