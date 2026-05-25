@@ -35,7 +35,8 @@ class EncryptedStorage:
         cipher = Cipher(algorithms.AES256(self.key), modes.GCM(iv), backend=default_backend())
         enc = cipher.encryptor()
         ct = enc.update(data.encode()) + enc.finalize()
-        return base64.b64encode(iv + enc.tag + ct).decode()
+        combined = iv + enc.tag + ct
+        return base64.b64encode(combined).decode()
 
     def _decrypt(self, enc: str) -> str:
         if not self.key:
@@ -56,18 +57,18 @@ class EncryptedStorage:
         conn.close()
 
     def save_message(self, addr: str, dir: str, msg: str):
-        enc = self._encrypt(msg)
+        encrypted = self._encrypt(msg)
         conn = sqlite3.connect(self.db_path)
-        conn.execute("INSERT INTO messages (peer_address, direction, message, timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)", (addr, dir, enc))
+        conn.execute("INSERT INTO messages (peer_address, direction, message, timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)", (addr, dir, encrypted))
         conn.commit()
         conn.close()
 
     def get_chat_history(self, addr: str, limit: int = 100) -> List[dict]:
         conn = sqlite3.connect(self.db_path)
-        cur = conn.execute("SELECT direction, message, timestamp FROM messages WHERE peer_address = ? ORDER BY timestamp DESC LIMIT ?", (addr, limit))
-        msgs = [{'direction': row[0], 'message': self._decrypt(row[1]), 'timestamp': row[2]} for row in cur.fetchall()]
+        cursor = conn.execute("SELECT direction, message, timestamp FROM messages WHERE peer_address = ? ORDER BY timestamp DESC LIMIT ?", (addr, limit))
+        messages = [{'direction': row[0], 'message': self._decrypt(row[1]), 'timestamp': row[2]} for row in cursor.fetchall()]
         conn.close()
-        return msgs
+        return messages
 
     def save_contact(self, addr: str, fp: str, alias: str = None):
         conn = sqlite3.connect(self.db_path)
@@ -77,8 +78,8 @@ class EncryptedStorage:
 
     def get_contacts(self) -> List[dict]:
         conn = sqlite3.connect(self.db_path)
-        cur = conn.execute("SELECT peer_address, peer_fingerprint, alias, last_seen, trusted FROM contacts")
-        contacts = [{'address': row[0], 'fingerprint': row[1], 'alias': row[2], 'last_seen': row[3], 'trusted': row[4]} for row in cur.fetchall()]
+        cursor = conn.execute("SELECT peer_address, peer_fingerprint, alias, last_seen, trusted FROM contacts")
+        contacts = [{'address': row[0], 'fingerprint': row[1], 'alias': row[2], 'last_seen': row[3], 'trusted': row[4]} for row in cursor.fetchall()]
         conn.close()
         return contacts
 
