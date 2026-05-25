@@ -6,4 +6,4 @@ echo "Connecting to $PEER_ADDR..."
 docker run -it \
   --rm \
   -v ~/.hyperion:/root/.hyperion \
-  hyperion:latest connect $PEER_ADDR
+  hyperion:latest connect "$PEER_ADDR"
