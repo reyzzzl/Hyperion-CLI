@@ -237,5 +237,6 @@ These resources serve as the architectural foundation for Hyperion:
 Issues and pull requests are highly welcome. If you catch a functional bug, a visual glitch, or a deep architectural flaw, please open a detailed diagnostic ticket via **GitHub Issues**.
 ## 📝 License
 Distributed under the **GNU General Public License v3.0**. Review the LICENSE container text block file for complete operational distribution and compilation rules.
-##📞Hyperion team contact
+
+## 📞Hyperion team contact
 [Contact me](mailto:Hyperionteam@proton.me)
