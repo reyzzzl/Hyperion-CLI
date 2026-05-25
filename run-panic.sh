@@ -1,3 +1,10 @@
 #!/bin/bash
-read -p "Type WIPE to delete all data: " confirm
-[ "$confirm" = "WIPE" ] && rm -rf ~/.hyperion && echo "Done"
+echo "PANIC BUTTON - Wipe all Hyperion data"
+echo "Type 'WIPE' to confirm:"
+read CONFIRM
+if [ "$CONFIRM" = "WIPE" ]; then
+    rm -rf ~/.hyperion
+    echo "All Hyperion data wiped from disk"
+else
+    echo "Cancelled"
+fi
