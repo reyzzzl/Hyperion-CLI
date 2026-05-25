@@ -19,7 +19,7 @@ setup(
         ]
     },
     author="Hyperion Team",
-    author_email="hyperionteam@proton.me",
+    author_email="Hyperionteam@proton.me",
     description="Post-Quantum Secure Messenger with Kyber-512, Double Ratchet, and Tor",
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
