@@ -3,6 +3,7 @@ import json
 import base64
 import secrets
 import hashlib
+import sys
 from pathlib import Path
 from typing import Optional, Dict, Callable
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -37,7 +38,11 @@ class SecureIdentity:
         nonce = secrets.token_bytes(12)
         cipher = AESGCM(key)
         ciphertext = cipher.encrypt(nonce, private_bytes, None)
-        return {'salt': base64.b64encode(salt).decode(), 'nonce': base64.b64encode(nonce).decode(), 'ciphertext': base64.b64encode(ciphertext).decode()}
+        return {
+            'salt': base64.b64encode(salt).decode(),
+            'nonce': base64.b64encode(nonce).decode(),
+            'ciphertext': base64.b64encode(ciphertext).decode()
+        }
 
     def _decrypt_private_key(self, enc_data: Dict[str, str], password: str) -> bytes:
         salt = base64.b64decode(enc_data['salt'])
@@ -61,14 +66,26 @@ class SecureIdentity:
                             private_bytes = self._decrypt_private_key(data['encrypted'], password)
                             self._key = ed25519.Ed25519PrivateKey.from_private_bytes(private_bytes)
                             return
-                        except Exception:
+                        except Exception as e:
                             if attempt == 2:
+                                print(f"\033[31m[!] Failed to decrypt identity after 3 attempts: {e}\033[0m")
+                                print("[!] Your identity file may be corrupted or you entered wrong password")
+                                print("[!] Backup your identity file or generate a new one manually")
                                 raise ValueError("Wrong password after 3 attempts")
-                    return
-            except Exception:
-                pass
+                else:
+                    print("\033[31m[!] Identity file has unknown format or is corrupted\033[0m")
+                    raise ValueError("Unknown identity format")
+            except Exception as e:
+                print(f"\033[31m[!] Failed to load identity: {e}\033[0m")
+                sys.exit(1)
+
+        print("\033[33m[!] No identity found. Generating new identity keypair...\033[0m")
         self._key = ed25519.Ed25519PrivateKey.generate()
-        private_bytes = self._key.private_bytes(encoding=serialization.Encoding.Raw, format=serialization.PrivateFormat.Raw, encryption_algorithm=serialization.NoEncryption())
+        private_bytes = self._key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption()
+        )
         password = self._ask_password("Set password for identity storage", "Create Identity")
         if password is None:
             raise ValueError("Password required")
@@ -78,6 +95,7 @@ class SecureIdentity:
         encrypted = self._encrypt_private_key(private_bytes, password)
         with open(self.storage_path, 'w') as f:
             json.dump({'encrypted': encrypted, 'version': 2}, f)
+        print(f"\033[32m[+] New identity generated and saved to {self.storage_path}\033[0m")
 
     def get_public_key(self) -> bytes:
         return self._key.public_key().public_bytes_raw()
