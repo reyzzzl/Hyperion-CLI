@@ -41,11 +41,9 @@ class Handshake:
         self.transport.send_all(data.encode() + self.DELIMITER)
         status_callback("[*] Waiting for client public key...")
         peer_data = json.loads(self.transport.recv_all_until().decode())
-        
         if not self._verify_peer(peer_data):
             status_callback("[!] Peer verification failed - aborting handshake")
             raise ValueError("Peer verification failed")
-        
         status_callback(f"[+] Peer verified: {self.peer_fingerprint}")
         status_callback("[*] Waiting for ciphertext...")
         ciphertext = self.transport.recv_all_until().decode()
@@ -54,11 +52,9 @@ class Handshake:
     def client_handshake(self, status_callback: Callable) -> Tuple[bytes, str]:
         status_callback("[*] Waiting for server public key...")
         peer_data = json.loads(self.transport.recv_all_until().decode())
-        
         if not self._verify_peer(peer_data):
             status_callback("[!] Peer verification failed - aborting handshake")
             raise ValueError("Peer verification failed")
-        
         status_callback(f"[+] Peer verified: {self.peer_fingerprint}")
         status_callback("[*] Encapsulating secret...")
         shared_secret, ciphertext = self.pqc.encapsulate(peer_data['pqc_pubkey'])
