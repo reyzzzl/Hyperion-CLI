@@ -127,9 +127,21 @@ class HyperionClient:
             identity_pub = base64.b64encode(self.identity.get_public_key()).decode()
             identity_sig = base64.b64encode(self.identity.sign((pubkey + identity_pub).encode())).decode()
             rekey_data = json.dumps({'type': 'rekey', 'pqc_pubkey': pubkey, 'identity_pub': identity_pub, 'signature': identity_sig})
-            self.transport.send_all(self.REHANDSHAKE_DELIMITER + rekey_data.encode() + self.DELIMITER)
-            peer_data = json.loads(self.transport.recv_all_until().decode())
-            ciphertext = peer_data['ciphertext']
+            self.transport.sock.settimeout(30)
+            try:
+                self.transport.send_all(self.REHANDSHAKE_DELIMITER + rekey_data.encode() + self.DELIMITER)
+                peer_data = json.loads(self.transport.recv_all_until().decode())
+                ciphertext = peer_data['ciphertext']
+            except socket.timeout:
+                self.log_callback("[!] Rehandshake timeout, aborting")
+                self.transport.sock.settimeout(None)
+                return
+            except Exception as e:
+                self.log_callback(f"[!] Rehandshake error: {e}")
+                self.transport.sock.settimeout(None)
+                return
+            finally:
+                self.transport.sock.settimeout(None)
             kyber_secret = self.pqc.decapsulate(ciphertext)
             root_key = self.pqc.derive_root_key(kyber_secret)
             self.active_session.ratchet = DoubleRatchet(root_key, self._auto_rekey_callback, is_initiator=False)
@@ -170,17 +182,30 @@ class HyperionClient:
         if not self.pqc:
             self.log_callback("[!] PQC not available")
             return False
+
+        is_onion = '.onion' in address.lower()
+        parts = address.split(':')
+        host = parts[0]
+        port = int(parts[1]) if len(parts) > 1 else 9999
+
         existing = self.session_manager.get_session(address)
         if existing and existing.ratchet is not None:
-            self.log_callback(f"[*] Reusing existing session with {address}")
+            self.log_callback(f"[*] Reusing existing session with {address}, reconnecting socket...")
+            if is_onion:
+                result = self.transport.connect_via_tor(address, 80)
+                if not result:
+                    self.log_callback("[!] Tor not available")
+                    return False
+                self.log_callback("[+] Connected via Tor")
+            else:
+                self.transport.connect_direct(host, port)
+                self.log_callback("[+] Connected directly")
             self.active_session = existing
             self._start_receive_loop()
             self._send_queued_messages()
             return True
-        elif existing and existing.ratchet is None:
-            self.log_callback(f"[*] Found stale session with {address}, re-handshaking...")
-        self.log_callback(f"[*] Connecting to {address}...")
-        is_onion = '.onion' in address.lower()
+
+        self.log_callback(f"[*] New connection to {address}...")
         if is_onion:
             result = self.transport.connect_via_tor(address, 80)
             if result:
@@ -189,11 +214,9 @@ class HyperionClient:
                 self.log_callback("[!] Tor not available")
                 return False
         else:
-            parts = address.split(':')
-            host = parts[0]
-            port = int(parts[1]) if len(parts) > 1 else 9999
             self.transport.connect_direct(host, port)
             self.log_callback("[+] Connected directly")
+
         self._complete_handshake(address)
         return True
 
