@@ -1,5 +1,4 @@
 # Hyperion PQC
-> currently in the process of creating a mobile application 
 
 
 ![Status Version](https://img.shields.io/badge/Status-V2-red.svg)
