@@ -61,6 +61,7 @@ class FileTransfer:
         if self._receiving and self._receiving['received_count'] == self._receiving['chunks']:
             file_data = b''.join(self._receiving['chunks_data'])
             downloads = Path.home() / 'Downloads'
+            downloads.mkdir(parents=True, exist_ok=True)
             filepath = downloads / f"hyperion_{self._receiving['filename']}"
             counter = 1
             while filepath.exists():
