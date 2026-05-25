@@ -13,10 +13,10 @@ class TorSocket:
     def _find_tor_port(self) -> Optional[int]:
         for port in [9050, 9150]:
             try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(2)
-                s.connect(('127.0.0.1', port))
-                s.close()
+                test_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                test_sock.settimeout(2)
+                test_sock.connect(('127.0.0.1', port))
+                test_sock.close()
                 return port
             except:
                 continue
@@ -25,7 +25,7 @@ class TorSocket:
     def create_server_socket(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind(('127.0.0.1', 9999))
+        self.sock.bind(('0.0.0.0', 9999))
         self.sock.listen(5)
         return self.sock
 
@@ -54,12 +54,12 @@ class TorSocket:
         return self.sock
 
     def send_all(self, data: bytes):
-        total = 0
-        while total < len(data):
-            sent = self.sock.send(data[total:])
+        total_sent = 0
+        while total_sent < len(data):
+            sent = self.sock.send(data[total_sent:])
             if sent == 0:
                 raise ConnectionError("Connection broken")
-            total += sent
+            total_sent += sent
 
     def recv_all_until(self, delimiter: bytes = b'||END||') -> bytes:
         data = b''
@@ -79,7 +79,6 @@ class TorSocket:
             except:
                 pass
             self.sock = None
-
 
 class TorHiddenService:
     def __init__(self, local_port: int = 9999):
