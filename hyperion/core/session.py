@@ -1,5 +1,4 @@
 import sqlite3
-import json
 import threading
 from dataclasses import dataclass, field
 from typing import Dict, Optional, List
