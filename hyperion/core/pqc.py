@@ -1,6 +1,7 @@
 import hashlib
 import base64
 import secrets
+import re
 from typing import Tuple, Optional
 
 try:
@@ -74,7 +75,7 @@ class PQCDilithium:
             result = verifier.verify(message, signature, public_key)
             verifier.cleanup()
             return result
-        except:
+        except Exception:
             return False
 
     def get_public_key(self) -> str:
@@ -97,17 +98,46 @@ class MultiKDF:
         from cryptography.hazmat.backends import default_backend
         try:
             import argon2
+            from argon2 import Type
             HAS_ARGON2 = True
         except ImportError:
             HAS_ARGON2 = False
+
         if HAS_ARGON2:
-            ph = argon2.PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4, hash_len=32)
-            argon_hash = ph.hash(password).encode()[:32]
+            try:
+                argon_raw = argon2.low_level.hash_secret_raw(
+                    secret=password.encode(),
+                    salt=salt,
+                    time_cost=3,
+                    memory_cost=65536,
+                    parallelism=4,
+                    hash_len=32,
+                    type=Type.ID
+                )
+                argon_hash = argon_raw[:32]
+            except AttributeError:
+                ph = argon2.PasswordHasher(
+                    time_cost=3,
+                    memory_cost=65536,
+                    parallelism=4,
+                    hash_len=32,
+                    type=Type.ID
+                )
+                argon_hash_str = ph.hash(password)
+                match = re.search(r'\$argon2id\$.*\$([A-Za-z0-9+/=]+)$', argon_hash_str)
+                if match:
+                    argon_raw = base64.b64decode(match.group(1))
+                    argon_hash = argon_raw[:32]
+                else:
+                    argon_hash = hashlib.sha3_256(password.encode() + salt + b'argon2_fallback').digest()
         else:
             argon_hash = hashlib.sha3_256(password.encode() + salt + b'argon2_fallback').digest()
+
         scrypt_kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1, backend=default_backend())
         scrypt_hash = scrypt_kdf.derive(password.encode())
+
         pbkdf2 = PBKDF2HMAC(algorithm=hashes.SHA3_512(), length=32, salt=salt, iterations=iterations, backend=default_backend())
         pbkdf2_hash = pbkdf2.derive(password.encode())
+
         combined = bytes(a ^ b ^ c for a, b, c in zip(argon_hash, scrypt_hash, pbkdf2_hash))
         return hashlib.sha3_512(combined + salt).digest()[:32]
