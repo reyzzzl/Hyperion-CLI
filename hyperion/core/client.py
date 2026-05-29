@@ -39,6 +39,7 @@ class HyperionClient:
 
     def set_password(self, password: str):
         self.storage = EncryptedStorage(f"{self.data_dir}/hyperion_messages.db", password)
+        self.session_manager.set_encryption_password(password)
 
     def set_password_callback(self, callback):
         self.identity = SecureIdentity(f"{self.data_dir}/hyperion_identity.json", password_callback=callback)
@@ -83,6 +84,10 @@ class HyperionClient:
             return
         try:
             decrypted = self.active_session.ratchet.decrypt(json.loads(data.decode()))
+            if self.active_session.ratchet:
+                self.active_session.send_counter = self.active_session.ratchet.send_message_count
+                self.active_session.recv_counter = self.active_session.ratchet.recv_message_count
+                self.session_manager._save_session(self.active_session)
             if self.storage:
                 self.storage.save_message(self.active_session.peer_address, "received", decrypted)
             self.message_callback(decrypted)
@@ -94,7 +99,7 @@ class HyperionClient:
         if not self.active_session:
             return
         if data == self.FILE_DELIMITER + b'END':
-            if hasattr(self, '_file_transfer'):
+            if hasattr(self, '_file_transfer') and self._file_transfer:
                 result = self._file_transfer.finalize_received_file()
                 if result:
                     self.log_callback(f"FILE Saved: {result}")
@@ -106,52 +111,23 @@ class HyperionClient:
                 meta_str = data
             try:
                 decrypted = self.active_session.ratchet.decrypt(json.loads(meta_str.decode()))
-                if hasattr(self, '_file_transfer'):
+                if hasattr(self, '_file_transfer') and self._file_transfer:
                     self._file_transfer.process_received_data(decrypted)
+                else:
+                    self.log_callback(f"[!] File data received but file transfer not ready")
             except Exception as e:
                 self.log_callback(f"FILE chunk error: {e}")
 
     def _handle_rehandshake(self, data: bytes):
-        self.log_callback("[*] Peer requested rekey...")
-        threading.Thread(target=self._perform_rehandshake, daemon=True).start()
+        self.log_callback("[*] Rehandshake request ignored (feature disabled)")
+        return
 
     def _perform_rehandshake(self):
-        with self._rehandshake_lock:
-            if not self.active_session:
-                return
-            if self._old_pqc:
-                self._old_pqc.cleanup()
-            self._old_pqc = self.pqc
-            self.pqc = PQCKyber()
-            pubkey = self.pqc.get_public_key()
-            identity_pub = base64.b64encode(self.identity.get_public_key()).decode()
-            identity_sig = base64.b64encode(self.identity.sign((pubkey + identity_pub).encode())).decode()
-            rekey_data = json.dumps({'type': 'rekey', 'pqc_pubkey': pubkey, 'identity_pub': identity_pub, 'signature': identity_sig})
-            self.transport.sock.settimeout(30)
-            try:
-                self.transport.send_all(self.REHANDSHAKE_DELIMITER + rekey_data.encode() + self.DELIMITER)
-                peer_data = json.loads(self.transport.recv_all_until().decode())
-                ciphertext = peer_data['ciphertext']
-            except socket.timeout:
-                self.log_callback("[!] Rehandshake timeout, aborting")
-                self.transport.sock.settimeout(None)
-                return
-            except Exception as e:
-                self.log_callback(f"[!] Rehandshake error: {e}")
-                self.transport.sock.settimeout(None)
-                return
-            finally:
-                self.transport.sock.settimeout(None)
-            kyber_secret = self.pqc.decapsulate(ciphertext)
-            root_key = self.pqc.derive_root_key(kyber_secret)
-            self.active_session.ratchet = DoubleRatchet(root_key, self._auto_rekey_callback, is_initiator=False)
-            self.active_session.shared_secret = root_key
-            self.active_session.last_active = datetime.now()
-            self.log_callback("[+] Re-handshake completed")
+        self.log_callback("[*] Rehandshake not implemented yet")
+        return
 
     def _auto_rekey_callback(self):
-        self.log_callback("[*] Auto-rekey triggered...")
-        threading.Thread(target=self._perform_rehandshake, daemon=True).start()
+        pass
 
     def start_server(self, address_callback):
         if not self.pqc:
@@ -189,10 +165,10 @@ class HyperionClient:
         port = int(parts[1]) if len(parts) > 1 else 9999
 
         existing = self.session_manager.get_session(address)
-        if existing and existing.ratchet is not None:
-            self.log_callback(f"[*] Reusing existing session with {address}, reconnecting socket...")
+        if existing and existing.shared_secret:
+            self.log_callback(f"[*] Reusing existing session with {address}, restoring ratchet...")
             if is_onion:
-                result = self.transport.connect_via_tor(address, 80)
+                result = self.transport.connect_via_tor(address.replace(f':{port}', ''), 80 if port == 9999 else port)
                 if not result:
                     self.log_callback("[!] Tor not available")
                     return False
@@ -200,6 +176,14 @@ class HyperionClient:
             else:
                 self.transport.connect_direct(host, port)
                 self.log_callback("[+] Connected directly")
+
+            from hyperion.core.ratchet import DoubleRatchet
+            ratchet = DoubleRatchet(existing.shared_secret, self._auto_rekey_callback,
+                                    is_initiator=False if 'unknown' in existing.peer_address else True)
+            ratchet.send_message_count = existing.send_counter
+            ratchet.recv_message_count = existing.recv_counter
+            existing.ratchet = ratchet
+
             self.active_session = existing
             self._start_receive_loop()
             self._send_queued_messages()
@@ -207,7 +191,7 @@ class HyperionClient:
 
         self.log_callback(f"[*] New connection to {address}...")
         if is_onion:
-            result = self.transport.connect_via_tor(address, 80)
+            result = self.transport.connect_via_tor(host, 80 if port == 9999 else port)
             if result:
                 self.log_callback("[+] Connected via Tor")
             else:
@@ -232,7 +216,9 @@ class HyperionClient:
                     peer_fingerprint=handshake.get_peer_fingerprint(),
                     shared_secret=root_key,
                     ratchet=ratchet,
-                    last_active=datetime.now()
+                    last_active=datetime.now(),
+                    send_counter=0,
+                    recv_counter=0
                 )
             else:
                 ciphertext = handshake.server_handshake(self.log_callback)
@@ -244,7 +230,9 @@ class HyperionClient:
                     peer_fingerprint=handshake.get_peer_fingerprint(),
                     shared_secret=root_key,
                     ratchet=ratchet,
-                    last_active=datetime.now()
+                    last_active=datetime.now(),
+                    send_counter=0,
+                    recv_counter=0
                 )
             self.session_manager.add_session(self.active_session)
             if self.storage:
@@ -270,6 +258,10 @@ class HyperionClient:
             return "Not connected"
         try:
             encrypted = json.dumps(self.active_session.ratchet.encrypt(message))
+            if self.active_session.ratchet:
+                self.active_session.send_counter = self.active_session.ratchet.send_message_count
+                self.active_session.recv_counter = self.active_session.ratchet.recv_message_count
+                self.session_manager._save_session(self.active_session)
             self.transport.send_all(encrypted.encode() + self.DELIMITER)
             if self.storage:
                 self.storage.save_message(self.active_session.peer_address, "sent", message)
@@ -310,9 +302,7 @@ class HyperionClient:
         return self.active_session.peer_fingerprint if self.active_session else "Unknown"
 
     def rekey(self):
-        if self.active_session and self.active_session.ratchet:
-            self.active_session.ratchet.rekey()
-            return True
+        self.log_callback("[!] Manual rekey is disabled (feature in development)")
         return False
 
     def panic(self):
