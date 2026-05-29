@@ -113,11 +113,6 @@ class HyperionCLI:
                     print(f"Your: {self.client.get_fingerprint()}")
                     if self.client.active_session:
                         print(f"Peer: {self.client.active_session.peer_fingerprint}")
-                elif msg == '/rekey':
-                    if self.client.rekey():
-                        print("[+] Rekey performed")
-                    else:
-                        print("[-] Cannot rekey")
                 elif msg == '/history' or msg.startswith('/history '):
                     parts = msg.split()
                     limit = int(parts[1]) if len(parts) > 1 else 50
@@ -132,6 +127,9 @@ class HyperionCLI:
                                 print(f"  \033[33m{direction}\033[0m [{h['timestamp']}]: {h['message']}")
                     else:
                         print("Storage not initialized")
+                elif msg == '/panic':
+                    self.cmd_panic(type('Args', (), {}))
+                    break
                 else:
                     err = self.client.send_message(msg)
                     if err:
@@ -148,7 +146,6 @@ class HyperionCLI:
   /contacts      - List contacts
   /send-file <p> - Send file
   /fingerprint   - Show fingerprints
-  /rekey         - Rotate keys
   /history [n]   - Show chat history (default 50)
   /panic         - Wipe all data
   /quit          - Exit
