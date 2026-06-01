@@ -4,7 +4,7 @@
 
 import os, sys, argparse, threading, getpass, json
 from pathlib import Path
-import time  # buat apa ya? lupa, tar dulu aja
+import time  # import aja dlu
 
 # fix path biar bisa import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
