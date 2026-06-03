@@ -4,10 +4,10 @@ resolver = "2"
 
 [workspace.package]
 version = "1.0.0"
-edition = "2021"
+edition = "2026"
 license = "GPL-3.0"
 authors = ["Hyperion Team"]
-repository = "https://github.com/hyperion/hyperion"
+repository = "https://github.com/reyzzzl/Hyperion-CLI"
 
 [workspace.dependencies]
 oqs = "0.9.0"
