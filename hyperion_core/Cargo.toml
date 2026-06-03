@@ -1,0 +1,23 @@
+[package]
+name = "hyperion_core"
+version = "1.0.0"
+edition = "2026"
+license = "GPL-3.0"
+authors = ["Hyperion Team"]
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+oqs = { workspace = true }
+zeroize = { workspace = true }
+blake2 = { workspace = true }
+sha2 = { workspace = true }
+hmac = { workspace = true }
+xchacha20poly1305 = { workspace = true }
+rand_core = { workspace = true }
+rand = { workspace = true }
+subtle = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+bincode = { workspace = true }
