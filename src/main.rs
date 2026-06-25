@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0
 mod cli;
 mod crypto;
 mod protocol;
