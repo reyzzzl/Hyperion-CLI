@@ -42,7 +42,7 @@ where D: serde::Deserializer<'de> {
     let plain: BTreeMap<u64, [u8; 32]> = BTreeMap::deserialize(d)?;
     Ok(plain.into_iter().map(|(k, v)| (k, Zeroizing::new(v))).collect())
 }
-
+// TODO: change Clone to into_state(self) or refrention mutable(I don't really understand for mapping this  tbh)
 #[derive(Serialize, Deserialize, Clone)]
 pub struct RatchetState {
     #[serde(serialize_with = "ser_chain", deserialize_with = "de_chain")]
