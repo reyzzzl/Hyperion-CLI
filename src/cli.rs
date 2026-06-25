@@ -111,7 +111,7 @@ fn cmd_export(password: &str, home: &PathBuf, kyber: bool, dilithium: bool) -> R
     }
     Ok(())
 }
-
+// FIX: unused some cryptographic logic
 fn cmd_host(password: &str, home: &PathBuf, port: u16, use_tor: bool) -> Result<()> {
     let (_ky_pk, ky_sk, _dil_pk, dil_sk) = load_identity(password, home)?;
     let db = Arc::new(Mutex::new(SessionDB::new(&home.join("sessions.db"), password)?));
