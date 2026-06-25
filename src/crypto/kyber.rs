@@ -3,9 +3,7 @@ use zeroize::{ZeroizeOnDrop, Zeroizing};
 use serde::{Serialize, Deserialize};
 use serde_bytes;
 use anyhow::{Result, anyhow};
-// TODO: i wanna using cache kem instance next avoid repeated allocation
-// options is: lazy_static/once cell,
-// accept &kem parameter
+
 #[derive(Serialize, Deserialize, ZeroizeOnDrop)]
 pub struct SecretKey(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
@@ -29,3 +27,6 @@ pub fn decaps(sk: &SecretKey, ct: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
     let ss = kem.decapsulate(&sk_obj, &ct_obj).map_err(|e| anyhow!("{:?}", e))?;
     Ok(Zeroizing::new(ss.into_vec()))
 }
+// TODO: i wanna using cache kem instance next avoid repeated allocation
+// options is: lazy_static/once cell,
+// accept &kem parameter
