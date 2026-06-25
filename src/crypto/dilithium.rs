@@ -39,6 +39,5 @@ pub fn signature_len() -> usize {
 // TODO: change Vec<u8> with array/container
 // constant if tht possible later
 // use type array static default oqs or
-// wrap with cotainer fixed-size is better for 
-// security 
+// wrap with cotainer fixed-size is better for security 
 // FIX: error handling more informative in function verify bc returns false if initialization fails in (.ok())
