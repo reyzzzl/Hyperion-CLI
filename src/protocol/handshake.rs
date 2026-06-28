@@ -24,7 +24,7 @@ pub fn initiator_handshake(
     let send = kdf::hkdf(Some(&root), b"init-send", b"ratchet", 32)?;
     let recv = kdf::hkdf(Some(&root), b"resp-send", b"ratchet", 32)?;
 
-// drop for wipe data in memory
+// drop for clean data in memory
     drop(ss);
     drop(root);
     Ok((my_eph_pk, ct, sig, (send, recv)))
