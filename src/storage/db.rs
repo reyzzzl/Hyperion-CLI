@@ -51,16 +51,21 @@ impl SessionDB {
         Ok(entries)
     }
 
+// Serialize, encryption, sve all to disk with atomic write
     fn save_all(&self, entries: &[SessionEntry]) -> Result<()> {
         let mut plain = serde_json::to_vec(entries)?;
+// take salt random 32bytes  for processing kdf every time save
         let salt = rand::random::<[u8; 32]>();
         let key = kdf::derive_key(self.password.as_bytes(), &salt)?;
+// encrypt json ssion
         let (nonce, ct) = xchacha::encrypt(&key, &plain, &[])?;
         plain.zeroize();
+// combine 
         let mut out = salt.to_vec();
         out.extend_from_slice(&nonce);
         out.extend_from_slice(&ct);
 
+// write with atomic write 
         let temp_path = self.path.with_extension("tmp");
         {
             let mut file = OpenOptions::new()
