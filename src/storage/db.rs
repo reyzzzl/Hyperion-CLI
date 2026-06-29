@@ -38,6 +38,7 @@ impl SessionDB {
             return Ok(vec![]);
         }
 // structure biner in disk
+// TODO: add validation size data.len() >= 56 before slicing
         let salt = &data[0..32];
         let nonce = &data[32..56];
         let ct = &data[56..];
