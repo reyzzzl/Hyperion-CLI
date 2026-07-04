@@ -1,4 +1,5 @@
-use chacha20poly1305::{XChaCha20Poly1305, Key, Nonce}; // fixed import
+use chacha20poly1305::{XChaCha20Poly1305, Key, Nonce};
+// fix previous import in XChaCha20Poly1305 
 use anyhow::Result;
 
 pub fn encrypt(key: &[u8; 32], nonce: &[u8; 24], data: &[u8]) -> Result<Vec<u8>> {
