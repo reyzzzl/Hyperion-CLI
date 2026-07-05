@@ -111,7 +111,10 @@ fn cmd_export(password: &str, home: &PathBuf, kyber: bool, dilithium: bool) -> R
     }
     Ok(())
 }
-// FIX: unused some cryptographic logic
+// FIXME: unused some cryptographic logic
+// this is for p2p only
+// jm using a regular tcp loop for simplicity, but do not connect more than 1 person
+// the stdin will collide during fingerprint verification. im too lazy to create an input queue
 fn cmd_host(password: &str, home: &PathBuf, port: u16, use_tor: bool) -> Result<()> {
     let (_ky_pk, ky_sk, _dil_pk, dil_sk) = load_identity(password, home)?;
     let db = Arc::new(Mutex::new(SessionDB::new(&home.join("sessions.db"), password)?));
@@ -192,7 +195,7 @@ fn cmd_connect(password: &str, home: &PathBuf, host: String, port: u16, use_tor:
     stream.set_nodelay(true)?;
 
     let (my_eph_pk, ct, sig, (send, recv)) = handshake::initiator_handshake(&peer_ky_pk, &my_dil_sk, &peer_dil_pk)?;
-    let handshake_msg = pack_msg(1, &[&my_eph_pk, &ct, &sig, &my_dil_pk].concat())?;
+    let handshake_msg = pack_msg(1, &[my_eph_pk.as_slice(), ct.as_slice(), sig.as_slice(), my_dil_pk.as_slice()].concat())?;
     send_frame(&stream, &handshake_msg)?;
 
     let resp = recv_frame(&stream)?;
@@ -214,8 +217,8 @@ fn cmd_connect(password: &str, home: &PathBuf, host: String, port: u16, use_tor:
         return Err(anyhow!("Server signature invalid"));
     }
 
-    let send_arr: [u8; 32] = send.as_ref().try_into().map_err(|_| anyhow!("invalid send chain"))?;
-    let recv_arr: [u8; 32] = recv.as_ref().try_into().map_err(|_| anyhow!("invalid recv chain"))?;
+    let send_arr: [u8; 32] = send.as_slice().try_into().map_err(|_| anyhow!("invalid send chain"))?;
+    let recv_arr: [u8; 32] = recv.as_slice().try_into().map_err(|_| anyhow!("invalid recv chain"))?;
     let ratchet = Ratchet::from_state(RatchetState::new(send_arr, recv_arr));
 
     {
@@ -283,10 +286,10 @@ fn handle_client(
         return Err(anyhow!("Client signature invalid"));
     }
 
-    // Note: ths server uses static kyber key for decaps (no ephemeral server key)
+    // ths server uses static kyber key for decaps (no ephemeral server key)
     // TODO: adding emphemeral server key
     // ths simplifies session management bt means forward secrecy is client-only
-    // TODO: adding forward secrency for 2 user, idk this can used but i will try next
+    // TODO: adding forward secrency for 2 user, this is mybe can consumn time long 
     let ss = kyber::decaps(&ky_sk, ct)?;
     let root = kdf::hkdf(None, &ss, b"handshake", 64)?;
     let send = kdf::hkdf(Some(&root), b"resp-send", b"ratchet", 32)?;
@@ -294,8 +297,8 @@ fn handle_client(
     drop(ss);
     drop(root);
 
-    let send_arr: [u8; 32] = send.as_ref().try_into().map_err(|_| anyhow!("invalid send chain"))?;
-    let recv_arr: [u8; 32] = recv.as_ref().try_into().map_err(|_| anyhow!("invalid recv chain"))?;
+    let send_arr: [u8; 32] = send.as_slice().try_into().map_err(|_| anyhow!("invalid send chain"))?;
+    let recv_arr: [u8; 32] = recv.as_slice().try_into().map_err(|_| anyhow!("invalid recv chain"))?;
     let ratchet = Ratchet::from_state(RatchetState::new(send_arr, recv_arr));
 
     let (sv_eph_pk, _) = kyber::keypair()?;
@@ -303,12 +306,12 @@ fn handle_client(
     let server_sig = dilithium::sign(&dil_sk, &msg_to_sign)?;
     let (_, _, my_dil_pk, _) = load_identity(password, home)?;
 
-    let resp = [&sv_eph_pk, &server_sig, &my_dil_pk].concat();
+    let resp = [sv_eph_pk.as_slice(), server_sig.as_slice(), my_dil_pk.as_slice()].concat();
     send_frame(&stream, &pack_msg(2, &resp)?)?;
 
     let peer_id = format!("{}", stream.peer_addr()?);
     {
-        let mut db_guard = db.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let db_guard = db.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         db_guard.save_session(&peer_id, cl_dil_pk, &ratchet.get_state())?;
     }
 
@@ -382,7 +385,7 @@ fn chat_loop(
     Ok(())
 }
 
-fn send_frame(stream: &TcpStream, data: &[u8]) -> Result<()> {
+fn send_frame(mut stream: &TcpStream, data: &[u8]) -> Result<()> {
     let len = data.len() as u32;
     let mut buf = len.to_be_bytes().to_vec();
     buf.extend_from_slice(data);
@@ -390,7 +393,7 @@ fn send_frame(stream: &TcpStream, data: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn recv_frame(stream: &TcpStream) -> Result<Vec<u8>> {
+fn recv_frame(mut stream: &TcpStream) -> Result<Vec<u8>> {
     let mut len_buf = [0u8; 4];
     let mut read = 0;
     while read < 4 {
