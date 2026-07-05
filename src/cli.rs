@@ -190,7 +190,7 @@ fn cmd_connect(password: &str, home: &PathBuf, host: String, port: u16, use_tor:
         let tor = TorTransport::new()?;
         tor.connect(&host, port)?
     } else {
-        TcpStream::connect((host, port))?
+        TcpStream::connect((host.as_str(), port))?
     };
     stream.set_nodelay(true)?;
 
