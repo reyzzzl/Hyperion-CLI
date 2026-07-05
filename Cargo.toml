@@ -16,7 +16,7 @@ blake2 = "0.10"
 sha2 = "0.10"
 chacha20poly1305 = { version = "0.10", features = ["std"] }
 aead = "0.5"
-oqs = "0.9.0"
+oqs = { version = "0.9.0", default-features = false, features = ["kems", "sigs", "std"] }
 zeroize = { version = "1.7", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
