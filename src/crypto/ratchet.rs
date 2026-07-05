@@ -6,9 +6,7 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::crypto::xchacha;
 
 pub const MAX_SEQ: usize = 1000;
-// TODO: unused zeroize in ratchet
-// mybe this trugger warning bt this for 
-// additional security 
+// TODO: check if zeroize is actually needed hre or if its dead code
 fn ser_chain<S>(key: &Zeroizing<[u8; 32]>, s: S) -> Result<S::Ok, S::Error>
 where S: serde::Serializer {
     s.serialize_bytes(&**key)
@@ -23,7 +21,8 @@ where D: serde::Deserializer<'de> {
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
             formatter.write_str("32 bytes")
         }
-        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E> {
+        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+        where E: serde::de::Error {
             let arr: [u8; 32] = v.try_into().map_err(|_| serde::de::Error::invalid_length(v.len(), &"32"))?;
             Ok(Zeroizing::new(arr))
         }
@@ -42,7 +41,7 @@ where D: serde::Deserializer<'de> {
     let plain: BTreeMap<u64, [u8; 32]> = BTreeMap::deserialize(d)?;
     Ok(plain.into_iter().map(|(k, v)| (k, Zeroizing::new(v))).collect())
 }
-// TODO: change Clone to into_state(self) or refrention mutable(I don't really understand for mapping this  tbh)
+// TODO: refactor get_state to avoid .clone(). check if passing  ownership r &mut works better here
 #[derive(Serialize, Deserialize, Clone)]
 pub struct RatchetState {
     #[serde(serialize_with = "ser_chain", deserialize_with = "de_chain")]
