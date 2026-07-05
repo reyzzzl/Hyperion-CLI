@@ -15,7 +15,7 @@ pub fn keypair() -> Result<(Vec<u8>, SecretKey)> {
 
 pub fn sign(sk: &SecretKey, msg: &[u8]) -> Result<Vec<u8>> {
     let sig = Sig::new(Algorithm::Dilithium5).map_err(|e| anyhow!("{:?}", e))?;
-    let sk_obj = sig.secret_key_from_bytes(&sk.0).map_err(|e| anyhow!("{:?}", e))?;
+    let sk_obj = sig.secret_key_from_bytes(&sk.0).ok_or_else(|| anyhow!("invalid secret key"))?;
     let s = sig.sign(msg, &sk_obj).map_err(|e| anyhow!("{:?}", e))?;
     Ok(s.into_vec())
 }
@@ -24,9 +24,9 @@ pub fn verify(pk: &[u8], msg: &[u8], sig_bytes: &[u8]) -> bool {
     Sig::new(Algorithm::Dilithium5)
         .ok()
         .and_then(|s| {
-            let pk_obj = s.public_key_from_bytes(pk).ok()?;
-            let sig_obj = s.signature_from_bytes(sig_bytes).ok()?;
-            s.verify(msg, &sig_obj, &pk_obj).ok()
+            let pk_obj = s.public_key_from_bytes(pk)?;
+            let sig_obj = s.signature_from_bytes(sig_bytes)?;
+            Some(s.verify(msg, &sig_obj, &pk_obj).is_ok())
         })
         .unwrap_or(false)
 }
