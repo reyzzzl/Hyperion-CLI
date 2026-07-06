@@ -56,6 +56,11 @@ jobs:
         run: |
           mkdir -p dist
           cp target/${{ matrix.target }}/release/${{ matrix.artifact }} dist/${{ matrix.asset_name }}
+      - name: Test binary runs
+        shell: bash
+        run: |
+          chmod +x dist/${{ matrix.asset_name }} || true
+          ./dist/${{ matrix.asset_name }} --help
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
