@@ -38,29 +38,29 @@ the encryption used in ordinary messengers now often includes RSA, ECDH, etc, of
 download the latest binary for your platform from [Releases](https://github.com/reyzzzl/Hyperion-CLI/releases/latest).
 
 ### linux
-\`\`\`
+```
 curl -L -o hyperion https://github.com/reyzzzl/Hyperion-CLI/releases/latest/download/hyperion-linux
 chmod +x hyperion
-\`\`\`
+```
 
 ### macos
-\`\`\`
+```
 curl -L -o hyperion https://github.com/reyzzzl/Hyperion-CLI/releases/latest/download/hyperion-macos
 chmod +x hyperion
 xattr -d com.apple.quarantine hyperion
-\`\`\`
+```
 
 ### windows 
-\`\`\`
+```
 Invoke-WebRequest -Uri "https://github.com/reyzzzl/Hyperion-CLI/releases/latest/download/hyperion-windows.exe" -OutFile "hyperion.exe"
-\`\`\`
+```
 
 ## Usage
-\`\`\`
+```
 hyperion --password <PASSWORD> init
 hyperion --password <PASSWORD> host --port <PORT>
 hyperion --password <PASSWORD> connect --host <HOST> --port <PORT>
-\`\`\`
+```
    
 ## next update 
 - add emphadd emeral key or 2 client
