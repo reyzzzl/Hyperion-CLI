@@ -5,7 +5,7 @@
 ![Type CLI--Application](https://img.shields.io/badge/Type-CLI%20Application-blue.svg)
 ![Crypto Kyber--512%20%7C%20ML--KEM](https://img.shields.io/badge/Crypto-Kyber--512%20%7C%20ML--KEM-orange)
 ![Network Tor%20Onion%20Routing](https://img.shields.io/badge/Network-Tor%20Onion%20Routing-purple)
-![languange](https://img.shields.io/badge/Rust-cream)
+![languange](https://img.shields.io/badge/-Language Rust-cream)
 
 **Post-Quantum Encrypted Messenger — CLI-based, Tor-enabled, Quantum-Resistant**
 
